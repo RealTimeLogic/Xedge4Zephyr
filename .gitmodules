@@ -4,3 +4,9 @@
 [submodule "main/BAS-Resources"]
 	path = main/BAS-Resources
 	url = https://github.com/RealTimeLogic/BAS-Resources.git
+[submodule "BAS"]
+	path = BAS
+	url = https://github.com/RealTimeLogic/BAS.git
+[submodule "BAS-Resources"]
+	path = BAS-Resources
+	url = https://github.com/RealTimeLogic/BAS-Resources.git
