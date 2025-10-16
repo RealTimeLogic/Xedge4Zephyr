@@ -1,0 +1,71 @@
+# Xedge RTOS Module Configuration
+# This file provides Kconfig options for the Xedge module
+
+menuconfig XEDGE
+	bool "Xedge Barracuda App Server Support"
+	default n
+	depends on NETWORKING
+	depends on NET_SOCKETS
+	help
+	  Enable Xedge RTOS, which provides the Barracuda App Server
+	  with embedded HTTP(S) server, WebSocket support, and Lua runtime
+	  for rapid IoT application development.
+
+if XEDGE
+
+config XEDGE_STACK_SIZE
+	int "Xedge server thread stack size"
+	default 16384
+	help
+	  Stack size in bytes for the main Xedge server thread.
+	  Minimum recommended: 8192 bytes.
+	  For native_sim, 16384 or higher is recommended.
+
+config XEDGE_THREAD_PRIORITY
+	int "Xedge server thread priority"
+	default 5
+	range 0 15
+	help
+	  Priority for the Xedge server thread.
+	  Lower values = higher priority.
+
+config XEDGE_ENABLE_DISK_IO
+	bool "Enable disk I/O support"
+	default y
+	depends on FILE_SYSTEM
+	help
+	  Enable file system support for Xedge.
+	  Requires Zephyr file system to be configured.
+
+config XEDGE_ENABLE_AUX
+	bool "Enable auxiliary Lua bindings"
+	default n
+	help
+	  Enable custom Lua bindings for device-specific functionality.
+	  You must implement xedgeOpenAUX() in your application.
+
+config XEDGE_HEAP_SIZE
+	int "Xedge heap size for dlmalloc"
+	default 2097152
+	help
+	  Heap size in bytes for Xedge's dlmalloc allocator.
+	  Default: 2MB. Adjust based on your application needs.
+
+config XEDGE_ENABLE_DEBUGGER
+	bool "Enable Lua debugger support"
+	default y
+	help
+	  Enable Lua debugging capabilities.
+	  This increases code size but allows remote debugging.
+
+config XEDGE_MAX_THREADS
+	int "Maximum number of threads"
+	default 2
+	range 1 10
+	help
+	  Maximum number of concurrent threads for the server.
+
+
+
+endif # XEDGE
+

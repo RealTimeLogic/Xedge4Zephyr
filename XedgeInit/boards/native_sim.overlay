@@ -1,0 +1,40 @@
+/ {
+    /* Ensure simulated flash is the default flash device */
+    chosen {
+        zephyr,flash = &flash0;
+    };
+
+    /* Create zephyr_fstab and add a LittleFS entry that mounts at /xedge */
+    zephyr_fstab: zephyr_fstab {
+        compatible = "zephyr,fstab";
+
+        lfs_xedge: lfs_xedge {
+            compatible  = "zephyr,fstab,littlefs";
+            partition   = <&lfs0>;
+            mount-point = "/xedge";
+            automount;
+
+            /* Reasonable defaults for native_sim */
+            read-size      = <16>;
+            prog-size      = <16>;
+            cache-size     = <64>;
+            lookahead-size = <32>;
+            block-cycles = <512>;
+        };
+    };
+};
+
+/* Define a partition on the simulated flash and label it 'lfs0' */
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells    = <1>;
+
+        /* 1 MiB for LittleFS (tune as needed) */
+        lfs0: partition@0 {
+            label = "xedgestorage";
+            reg = <0x00000000 0x00100000>;
+        };
+    };
+};
