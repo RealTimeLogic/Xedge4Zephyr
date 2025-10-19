@@ -205,7 +205,7 @@ Edit `/etc/iproute2/rt_tables` and add the two lines:
 
 ```
 100 zeth
-200 eth0
+200 eth0    or enp0s3, wlp2s0, etc. (details below)
 ```
 
 #### Configure NAT:
@@ -306,9 +306,7 @@ sudo socat -d -d TCP-LISTEN:8090,fork,reuseaddr TCP:10.200.200.2:80
 
 This forwards traffic from port 8090 on the WSL2 host to the Xedge simulator’s port 80.
 
-You can now access Xedge from Windows via your WSL2 IP (for example, 172.29.54.156):
-
-http://172.29.54.156:8090/rtl/
+You can now access Xedge from Windows via your WSL2 IP (for example, 172.29.54.156) - e.g. `http://172.29.54.156:8090/rtl/`
 
 
 **Tip:** You can find your WSL2 IP address by running the following in a WSL2 console:

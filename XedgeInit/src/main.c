@@ -16,6 +16,7 @@
 #include <HttpTrace.h>
 #include <HttpServer.h>
 #include <BaErrorCodes.h>
+#include <xedge.h>
 
 // From Xedge (xedge.c) - the main server loop.
 extern void barracuda(void);
@@ -93,6 +94,16 @@ int xedgeInitDiskIo(DiskIo* dio)
    return 0;
 }
 #endif
+
+/*
+  The function below is called by the Xedge startup code.
+  This is a good place to add your own Lua bindings.
+  See example code in BAS/examples/xedge/src led.c and AsynchLua.c
+*/
+int xedgeOpenAUX(XedgeOpenAUX* aux)
+{
+   return 0; /* OK */
+}
 
 
 /**

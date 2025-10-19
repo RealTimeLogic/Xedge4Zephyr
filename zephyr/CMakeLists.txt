@@ -47,12 +47,32 @@ endif()
 zephyr_compile_definitions(
   BA_ZEPHYR=1
   USE_DLMALLOC=1
-  B_LITTLE_ENDIAN=1
   MAXTHREADS=${CONFIG_XEDGE_MAX_THREADS}
-  BA_STACKSZ=16384
-  NO_ENCRYPTIONKEY=1
-  NO_SHARKTRUST=1
+  BA_STACKSZ=${CONFIG_XEDGE_STACK_SIZE}
 )
+
+# Conditional definitions based on Kconfig
+if(NOT XEDGE_ENABLE_ENCRYPTION_KEY)
+  zephyr_compile_definitions(NO_ENCRYPTIONKEY=1)
+endif()
+
+# Conditional definitions based on Kconfig
+if(NOT XEDGE_ENABLE_SHARKTRUST)
+  zephyr_compile_definitions(NO_SHARKTRUST=1)
+endif()
+
+# Conditional definitions based on Kconfig
+if(XEDGE_ENABLE_ZIPSIGNATURE)
+  zephyr_compile_definitions(USE_ZIPSIGNATURE=1)
+endif()
+
+# Conditional definitions based on Kconfig
+if(CONFIG_XEDGE_LUA_INTEGER)
+  zephyr_compile_definitions(LUA_NUMBER_INTEGER=1)
+else()
+  zephyr_compile_definitions(LUA_NUMBER_INTEGER=0)
+  zephyr_link_libraries(m)
+endif()
 
 # Conditional definitions based on Kconfig
 if(NOT CONFIG_XEDGE_ENABLE_DISK_IO)
@@ -60,11 +80,6 @@ if(NOT CONFIG_XEDGE_ENABLE_DISK_IO)
     NO_BAIO_DISK=1
   )
 endif()
-
-# Always define NO_XEDGE_AUX since we provide a stub in main.c
-zephyr_compile_definitions(
-  NO_XEDGE_AUX=1
-)
 
 if(CONFIG_XEDGE_ENABLE_DEBUGGER)
   zephyr_compile_definitions(

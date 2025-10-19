@@ -13,6 +13,13 @@ menuconfig XEDGE
 
 if XEDGE
 
+config XEDGE_LUA_INTEGER
+	bool "Compile Lua using integer only"
+	default y
+	help
+	  With this option, float numbers are disabled.
+          NOTE: Lua works best with float support.
+
 config XEDGE_STACK_SIZE
 	int "Xedge server thread stack size"
 	default 16384
@@ -37,13 +44,6 @@ config XEDGE_ENABLE_DISK_IO
 	  Enable file system support for Xedge.
 	  Requires Zephyr file system to be configured.
 
-config XEDGE_ENABLE_AUX
-	bool "Enable auxiliary Lua bindings"
-	default n
-	help
-	  Enable custom Lua bindings for device-specific functionality.
-	  You must implement xedgeOpenAUX() in your application.
-
 config XEDGE_HEAP_SIZE
 	int "Xedge heap size for dlmalloc"
 	default 2097152
@@ -57,6 +57,27 @@ config XEDGE_ENABLE_DEBUGGER
 	help
 	  Enable Lua debugging capabilities.
 	  This increases code size but allows remote debugging.
+
+config XEDGE_ENABLE_ENCRYPTION_KEY
+	bool "Enable TPM"
+	default y
+	help
+	  When enabled, create your own secret encryption key.
+          See BAS/examples/xedge/src/EncryptionKey.h 
+
+config XEDGE_ENABLE_SHARKTRUST
+	bool "Enable SharkTrustX"
+	default y
+	help
+	  See https://realtimelogic.com/products/SharkTrustX/
+          Generate your own: BAS/examples/xedge/src/tokengen.c
+
+config XEDGE_ENABLE_ZIPSIGNATURE
+	bool "Enable ZIP file signature check"
+	default n
+	help
+	  See https://realtimelogic.com/ba/doc/en/C/reference/html/SignEncZip.html
+          See also BAS/examples/xedge/src/ZipPublicKey.h
 
 config XEDGE_MAX_THREADS
 	int "Maximum number of threads"
