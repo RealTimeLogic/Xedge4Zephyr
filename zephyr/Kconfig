@@ -31,7 +31,7 @@ config XEDGE_STACK_SIZE
 config XEDGE_THREAD_PRIORITY
 	int "Xedge server thread priority"
 	default 5
-	range 0 15
+	range 2 15
 	help
 	  Priority for the Xedge server thread.
 	  Lower values = higher priority.

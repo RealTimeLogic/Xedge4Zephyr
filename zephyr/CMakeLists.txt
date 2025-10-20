@@ -88,21 +88,6 @@ if(CONFIG_XEDGE_ENABLE_DEBUGGER)
 endif()
 
 # Compiler flags to handle BAS/Lua code warnings
-zephyr_library_compile_options(
-  -Wno-char-subscripts
-  -Wno-implicit-fallthrough
-  -Wno-unused-function
-  -Wno-unused-value
-  -Wno-unused-variable
-  -Wno-format
-  -Wno-format-security
-  -Wno-pointer-sign
-  $<$<COMPILE_LANGUAGE:C>:-Wno-declaration-after-statement>
-  $<$<COMPILE_LANGUAGE:C>:-Wno-implicit-function-declaration>
-)
-
-# Link math library (required for Lua)
-zephyr_link_libraries(m)
+#zephyr_library_compile_options()
 
 endif() # CONFIG_XEDGE
-
