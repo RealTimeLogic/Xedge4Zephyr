@@ -15,7 +15,7 @@ if XEDGE
 
 config XEDGE_LUA_INTEGER
 	bool "Compile Lua using integer only"
-	default y
+	default n
 	help
 	  With this option, float numbers are disabled.
           NOTE: Lua works best with float support.

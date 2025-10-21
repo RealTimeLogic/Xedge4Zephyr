@@ -71,7 +71,6 @@ if(CONFIG_XEDGE_LUA_INTEGER)
   zephyr_compile_definitions(LUA_NUMBER_INTEGER=1)
 else()
   zephyr_compile_definitions(LUA_NUMBER_INTEGER=0)
-  zephyr_link_libraries(m)
 endif()
 
 # Conditional definitions based on Kconfig
