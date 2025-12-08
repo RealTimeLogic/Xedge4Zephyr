@@ -15,6 +15,7 @@ Xedge accelerates embedded firmware development by providing:
   - SMQ  
   - WebSockets  
   - HTTP / HTTPS  
+  - Embedded Web/App Server  
 
 **Product pages:**
 
