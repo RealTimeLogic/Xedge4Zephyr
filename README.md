@@ -21,6 +21,7 @@ Xedge accelerates embedded firmware development by providing:
 
 - [Xedge Toolkit](https://realtimelogic.com/products/xedge/)
 - [Barracuda Application Server C Source Code Library](https://realtimelogic.com/products/barracuda-application-server/)
+- [Xedge @ docs.zephyrproject.org](https://docs.zephyrproject.org/latest/develop/manifest/external/xedge.html)
 
 ---
 
