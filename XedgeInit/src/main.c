@@ -200,6 +200,7 @@ int main(void)
        else
        {
           LOG_ERR("NTP sync failed: %d. Did you configure your network?", ret);
+          k_sleep(K_SECONDS(2));
        }
     }
     
