@@ -199,7 +199,8 @@ int main(void)
        }
        else
        {
-          LOG_ERR("NTP sync failed: %d. Did you configure your network?", ret);
+          LOG_ERR("NTP sync failed: %s (%d). Did you configure your network?",
+                  zsock_gai_strerror(ret), ret);
           k_sleep(K_SECONDS(2));
        }
     }
