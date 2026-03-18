@@ -212,18 +212,26 @@ Edit `/etc/iproute2/rt_tables` and add the two lines:
 
 #### Configure NAT:
 
-```
+The script auto-detects both the outbound interface and its default gateway, so in the common case you can simply run:
+
+```bash
 chmod +x ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
+sudo ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
+```
+
+If auto-detection does not pick the correct values on your system, set these optional overrides before running the script:
+
+```bash
 export WAN_IFACE=<iface>
 export LAN_DEFAULT_GW=<ip-addr>
 sudo ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
 ```
 
-To find your network interface, run: `ip a`. Look for something like enp0s3 or wlp2s0.
+To find your network interface, run: `ip a`. Look for something like `eth0`, `enp0s3`, or `wlp2s0`.
 
-To find the gateway for that interface, run: `ip route`
+To find the gateway for that interface, run: `ip route`.
 
-**Note:** The script **defaults** to settings for Windows Subsystem for Linux (**WSL2**), so you don’t need to set the two environment variables when using WSL2.
+**Note:** Auto-detection works for both regular Linux and Windows Subsystem for Linux (**WSL2**). The environment variables are only needed when you want to override the detected interface or gateway.
 
 ## Running Xedge with Configured NAT Network
 
@@ -259,7 +267,7 @@ uart connected to pseudotty: /dev/pts/1
 [00:01:00.260,000] <inf> xedge_main: Uptime: 60 seconds
 ```
 
-**Note:** You see the xcfg.bin error since you have so far not created this file using the Xedge IDE.
+**Note:** You see the `xcfg.bin` error because you have not yet created this file using the Xedge IDE. On the initial startup, you will also see a file system error before the simulator performs a clean format of the disk. This is expected the first time you run the image, and it can also happen again if you delete the build directory and rebuild.
 
 To verify that Xedge is running and accessible, open a **separate terminal** and run:
 
@@ -319,5 +327,16 @@ ip addr show eth0
 
 ## What's Next
 
-Learn how to use the [Xedge IDE](https://realtimelogic.com/ba/doc/en/Xedge.html) and explore the built-in Lua environment.  
-Start by copying example code from the [online Lua tutorials](https://tutorial.realtimelogic.com/) and pasting it into the IDE.
+Now that Xedge is running in the simulator, the next step is to connect Xedge to your firmware.
+
+In a typical Xedge-based design, low-level and performance-critical code stays in C, while higher-level device logic is implemented in Lua. To make this work, you expose selected firmware APIs to Lua by creating Lua bindings for the C functions your application needs, such as sensor access, device control, configuration, fieldbus access, or product-specific services.
+
+In this project, the intended place to add those bindings is `XedgeInit/src/main.c` in the `xedgeOpenAUX()` function. You can also study `BAS/examples/xedge/src/led.c` and `BAS/examples/xedge/src/AsynchLua.c` for binding examples.
+
+Start with the Lua binding tutorial:
+- https://tutorial.realtimelogic.com/Lua-Bindings.lsp
+
+For a higher-level explanation of why Xedge uses Lua on top of C in embedded systems, see:
+- https://realtimelogic.com/articles/Using-Lua-for-Embedded-Development-vs-Traditional-C-Code
+
+Once your firmware APIs are exposed to Lua, you can use the [Xedge IDE](https://realtimelogic.com/ba/doc/en/Xedge.html) and the [online Lua tutorials](https://tutorial.realtimelogic.com/) to build the product-specific application logic on top of those bindings.
