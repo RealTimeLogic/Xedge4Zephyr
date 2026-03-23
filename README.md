@@ -2,8 +2,7 @@
 
 *A Lua-powered IoT and web framework for Zephyr and embedded systems.*
 
-**Xedge** is a robust IoT and web framework designed specifically for microcontrollers.  
-It’s built on the **industrial-grade Barracuda Application Server (BAS)** and engineered for seamless OEM integration.
+**Xedge** is a robust IoT and web framework designed specifically for microcontrollers. It's built on the **industrial-grade Barracuda Application Server (BAS)** and engineered for seamless OEM integration.
 
 Xedge accelerates embedded firmware development by providing:
 
@@ -27,8 +26,7 @@ Xedge accelerates embedded firmware development by providing:
 
 ## About This Guide
 
-This guide explains how to **build and run Xedge on the Zephyr host simulator**.  
-You can reuse the same build files for your own target and project, but we recommend first following this tutorial **exactly as written** to verify your setup and test Xedge using the **host simulator**.
+This guide explains how to **build and run Xedge on the Zephyr host simulator**. You can reuse the same build files for your own target and project, but we recommend first following this tutorial **exactly as written** to verify your setup and test Xedge using the **host simulator**.
 
 ## Prerequisites
 
@@ -43,14 +41,11 @@ $ source ~/zephyrproject/.venv/bin/activate
 
 ### File System Support
 
-The Xedge build configuration includes **file system support** by default.  
-While Xedge can be built **without** a file system, having one makes it easier to develop and test Lua code directly on a running Zephyr system.
+The Xedge build configuration includes **file system support** by default. While Xedge can be built **without** a file system, having one makes it easier to develop and test Lua code directly on a running Zephyr system.
 
-If your target hardware does not support a file system, you can exclude it in your build configuration later.  
-For now, ensure file system support **remains enabled**.
+If your target hardware does not support a file system, you can exclude it in your build configuration later. For now, ensure file system support **remains enabled**.
 
-When running Xedge on the **Zephyr host simulator**, Zephyr relies on **FUSE (Filesystem in Userspace)** under Linux.  
-Because the simulator is compiled as a **32-bit application**, you must install the **32-bit FUSE developer libraries**:
+When running Xedge on the **Zephyr host simulator**, Zephyr relies on **FUSE (Filesystem in Userspace)** under Linux. Because the simulator is compiled as a **32-bit application**, you must install the **32-bit FUSE developer libraries**:
 
 ```bash
 sudo dpkg --add-architecture i386
@@ -60,8 +55,7 @@ sudo apt-get install -y libfuse-dev:i386 gcc-multilib g++-multilib
 
 ## Creating a Workspace
 
-For this guide, we'll create a new **Zephyr workspace** dedicated to building Xedge.  
-Later, you can integrate the Xedge module into your own existing workspace.
+For this guide, we'll create a new **Zephyr workspace** dedicated to building Xedge. Later, you can integrate the Xedge module into your own existing workspace.
 
 We'll name the workspace **`xedgews`**, but you can choose any name, just remember to adjust the commands accordingly.
 
@@ -89,8 +83,7 @@ git submodule update --init --remote
 
 ## Step 3: Build the Xedge Resource File
 
-A significant portion of Xedge is implemented in **Lua**.  
-To include these Lua resources in your Zephyr build, we must:
+A significant portion of Xedge is implemented in **Lua**. To include these Lua resources in your Zephyr build, we must:
 
 1. Build the **resource file (ZIP)**
 2. Convert the ZIP file to **C source code**
@@ -104,7 +97,7 @@ printf "n\nl\nn\n" | bash Xedge.sh
 cp XedgeZip.c ../../BAS/examples/xedge/
 ```
 
-The printf command is used here to automate the prompts in the Xedge.sh build script. As you become more familiar with Xedge, you’ll have the flexibility to choose which modules and resources to include in the generated resource file.
+The printf command is used here to automate the prompts in the Xedge.sh build script. As you become more familiar with Xedge, you'll have the flexibility to choose which modules and resources to include in the generated resource file.
 
 ### Step 4: Register the Xedge4Zephyr Module in the West Manifest
 
@@ -165,14 +158,14 @@ After a successful build, run Xedge with:
 west build -t run
 ```
 
-On the first launch in the simulator, you’ll likely see LittleFS report an error and then auto-format:
+On the first launch in the simulator, you'll likely see LittleFS report an error and then auto-format:
 
 ```
 <wrn> littlefs: can't mount (LFS -84); formatting
 ```
 
 This is expected the first time the simulated flash is empty or uninitialized.
-After formatting, the file system will mount normally and subsequent runs won’t show this warning.
+After formatting, the file system will mount normally and subsequent runs won't show this warning.
 
 You will also see the following error:
 
@@ -180,11 +173,11 @@ You will also see the following error:
 <err> xedge_main: NTP sync failed: -101. Did you configure your network?
 ```
 
-The reason you’re seeing the NTP sync error is because the file `modules/Xedge4Zephyr/XedgeInit/src/main.c` tries to fetch time from the Internet, but the zeth interface hasn’t been started and NAT isn’t configured yet.
+The reason you're seeing the NTP sync error is because the file `modules/Xedge4Zephyr/XedgeInit/src/main.c` tries to fetch time from the Internet, but the zeth interface hasn't been started and NAT isn't configured yet.
 
 ### Configure `zeth`
 
-The zeth interface is a virtual Ethernet device that connects the Zephyr simulator to the host’s network. It lets the simulated system exchange IP traffic with external networks through the host. Because the simulator runs in a virtual environment without direct Internet access, zeth works together with NAT (Network Address Translation) on the host to route and translate packets so Zephyr can communicate with the outside world as if it were real hardware.
+The zeth interface is a virtual Ethernet device that connects the Zephyr simulator to the host's network. It lets the simulated system exchange IP traffic with external networks through the host. Because the simulator runs in a virtual environment without direct Internet access, zeth works together with NAT (Network Address Translation) on the host to route and translate packets so Zephyr can communicate with the outside world as if it were real hardware.
 
 Our setup requires modifications to the default `zeth.conf` configuration file. Do the following only one time:
 
@@ -286,9 +279,7 @@ You should see the **Xedge IDE** load in your browser.
 
 ## Accessing Xedge via WSL2
 
-When using **WSL2**, networking is slightly more complex because it runs behind a **double NAT**.  
-The Zephyr simulator creates a virtual interface named **`zeth`**, which is not directly reachable from Windows.  
-To fix this, you can connect to Xedge in one of two ways:
+When using **WSL2**, networking is slightly more complex because it runs behind a **double NAT**. The Zephyr simulator creates a virtual interface named **`zeth`**, which is not directly reachable from Windows. To fix this, you can connect to Xedge in one of two ways:
 
 ---
 
@@ -306,15 +297,15 @@ This creates a route from Windows to the zeth network interface inside WSL2. You
 
 ### Option 2: Set Up a Tunnel
 
-If routing doesn’t work or you prefer a quick alternative, you can create a TCP tunnel using socat.
+If routing doesn't work or you prefer a quick alternative, you can create a TCP tunnel using socat.
 
-Open a new WSL2 terminal. Run the following command (install socat if you don’t already have it):
+Open a new WSL2 terminal. Run the following command (install socat if you don't already have it):
 
 ```bash
 sudo socat -d -d TCP-LISTEN:8090,fork,reuseaddr TCP:10.200.200.2:80
 ```
 
-This forwards traffic from port 8090 on the WSL2 host to the Xedge simulator’s port 80.
+This forwards traffic from port 8090 on the WSL2 host to the Xedge simulator's port 80.
 
 You can now access Xedge from Windows via your WSL2 IP (for example, 172.29.54.156) - e.g. `http://172.29.54.156:8090/rtl/`
 
@@ -324,6 +315,49 @@ You can now access Xedge from Windows via your WSL2 IP (for example, 172.29.54.1
 ```
 ip addr show eth0
 ```
+
+## Quick Rebuild and Run
+
+If you have already completed a successful build and want to restart the simulated environment, you can copy and paste the following commands into your Linux shell:
+
+``` bash
+source ~/zephyrproject/.venv/bin/activate
+sudo ~/xedgews/tools/net-tools/net-setup.sh start
+sleep 3
+sudo ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
+cd xedgews
+west build -t run
+```
+
+## Troubleshooting: Flash Mount Point Error
+
+You may occasionally see the following error when starting the simulator:
+
+``` console
+Failed to create directory for flash mount point (flash): File exists
+```
+
+When this happens, the simulator may exit immediately. In most cases, simply rerunning the command resolves the issue.
+
+## Xedge Menuconfig Options
+
+You can inspect and change the Xedge-specific configuration options by running:
+
+```bash
+west build -t menuconfig
+```
+
+In the menuconfig UI, press `/` and search for `xedge` to jump to the available options.
+
+The most important Xedge options are:
+
+- `XEDGE`: Master enable switch for the Xedge module.
+- `XEDGE_THREAD_PRIORITY`: Zephyr thread priority used for the Xedge server thread(s).
+- `XEDGE_ENABLE_DISK_IO`: Enables filesystem-backed storage under `/xedge`. Disable this for a no-filesystem build.
+- `XEDGE_HEAP_SIZE`: Size of the dlmalloc heap reserved for Xedge at startup.
+- `XEDGE_ENABLE_ENCRYPTION_KEY`: Enables support for your device-specific encryption key.
+- `XEDGE_ENABLE_SHARKTRUST`: Enables SharkTrustX support.
+- `XEDGE_MAX_THREADS`: Sets the maximum number of concurrent Xedge server threads.
 
 ## What's Next
 

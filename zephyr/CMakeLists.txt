@@ -52,25 +52,23 @@ zephyr_compile_definitions(
 )
 
 # Conditional definitions based on Kconfig
-if(NOT XEDGE_ENABLE_ENCRYPTION_KEY)
+if(NOT CONFIG_XEDGE_ENABLE_ENCRYPTION_KEY)
   zephyr_compile_definitions(NO_ENCRYPTIONKEY=1)
 endif()
 
 # Conditional definitions based on Kconfig
-if(NOT XEDGE_ENABLE_SHARKTRUST)
+if(NOT CONFIG_XEDGE_ENABLE_SHARKTRUST)
   zephyr_compile_definitions(NO_SHARKTRUST=1)
 endif()
 
 # Conditional definitions based on Kconfig
-if(XEDGE_ENABLE_ZIPSIGNATURE)
-  zephyr_compile_definitions(USE_ZIPSIGNATURE=1)
+if(CONFIG_XEDGE_ENABLE_REVCON)
+  zephyr_compile_definitions(USE_REVCON=1)
 endif()
 
 # Conditional definitions based on Kconfig
-if(CONFIG_XEDGE_LUA_INTEGER)
-  zephyr_compile_definitions(LUA_NUMBER_INTEGER=1)
-else()
-  zephyr_compile_definitions(LUA_NUMBER_INTEGER=0)
+if(CONFIG_XEDGE_ENABLE_ZIPSIGNATURE)
+  zephyr_compile_definitions(USE_ZIPSIGNATURE=1)
 endif()
 
 # Conditional definitions based on Kconfig

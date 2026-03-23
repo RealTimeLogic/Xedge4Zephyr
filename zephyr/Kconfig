@@ -13,20 +13,11 @@ menuconfig XEDGE
 
 if XEDGE
 
-config XEDGE_LUA_INTEGER
-	bool "Compile Lua using integer only"
-	default n
-	help
-	  With this option, float numbers are disabled.
-          NOTE: Lua works best with float support.
-
 config XEDGE_STACK_SIZE
-	int "Xedge server thread stack size"
-	default 16384
+	int "Xedge/BAS server thread stack size"
+	default 24000
 	help
-	  Stack size in bytes for the main Xedge server thread.
-	  Minimum recommended: 8192 bytes.
-	  For native_sim, 16384 or higher is recommended.
+	  Sets the Barracuda App Server (BAS) macro BA_STACKSZ
 
 config XEDGE_THREAD_PRIORITY
 	int "Xedge server thread priority"
@@ -71,6 +62,13 @@ config XEDGE_ENABLE_SHARKTRUST
 	help
 	  See https://realtimelogic.com/products/SharkTrustX/
           Generate your own: BAS/examples/xedge/src/tokengen.c
+
+config XEDGE_ENABLE_REVCON
+	bool "Enable the SharkTrustX reverse connection"
+	default y
+	help
+	  Sets macro USE_REVCON
+          Details: http://realtimelogic.com/ba/examples/xedge/readme.html#features
 
 config XEDGE_ENABLE_ZIPSIGNATURE
 	bool "Enable ZIP file signature check"
