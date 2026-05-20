@@ -354,7 +354,7 @@ The most important Xedge options are:
 - `XEDGE`: Master enable switch for the Xedge module.
 - `XEDGE_THREAD_PRIORITY`: Zephyr thread priority used for the Xedge server thread(s).
 - `XEDGE_ENABLE_DISK_IO`: Enables filesystem-backed storage under `/xedge`. Disable this for a no-filesystem build.
-- `XEDGE_HEAP_SIZE`: Size of the dlmalloc heap reserved for Xedge at startup.
+- `XEDGE_HEAP_SIZE`: Xedge (BAS) uses its own included dlmalloc allocator. This is the heap reserved for Xedge at startup in [main.c](XedgeInit/src/main.c). See the [porting](https://realtimelogic.com/ba/doc/en/introduction.html#porting) section in the documentation for memory requirements.
 - `XEDGE_ENABLE_ENCRYPTION_KEY`: Enables support for your device-specific encryption key.
 - `XEDGE_ENABLE_SHARKTRUST`: Enables SharkTrustX support.
 - `XEDGE_MAX_THREADS`: Sets the maximum number of concurrent Xedge server threads.
