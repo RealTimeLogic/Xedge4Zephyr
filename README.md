@@ -1,6 +1,12 @@
 # Xedge for Zephyr
 
-Build device interfaces, network services, and application logic directly on your embedded system. Xedge brings the Barracuda App Server (BAS), Lua runtime, and a browser-based integrated development environment (IDE) to Zephyr. Keep hardware control in C and develop your Lua and Lua Server Pages (LSP) applications from the browser, without reflashing firmware for each application change.
+Build device interfaces, network services, and application logic directly on your embedded system. [Xedge](https://realtimelogic.com/products/xedge/) brings the [Barracuda App Server](https://realtimelogic.com/products/barracuda-application-server/) (BAS), Lua runtime, and a browser-based integrated development environment (IDE) to Zephyr. Keep hardware control in C and develop your Lua and Lua Server Pages (LSP) applications from the browser, without reflashing firmware for each application change.
+
+![Xedge](https://realtimelogic.com/images/xedge/v1/Xedge.png)
+
+**Figure 1: Xedge in developer mode**
+
+
 
 ## Choose a target
 
