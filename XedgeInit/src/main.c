@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2025 Real Time Logic
+ * Copyright (c) 2025 - 2026 Real Time Logic
  * Xedge (xedge.c) and Barracuda App Server (BAS) initialization and startup code for the Zephyr RTOS
- * Target: native_sim, but should work for any target build
+ * Targets: native_sim, MIMXRT1060-EVKC, and STM32F746G-DISCO
  */
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
@@ -9,6 +9,8 @@
 #include <zephyr/net/sntp.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/net_event.h>
+#include <zephyr/drivers/entropy.h>
+#include <zephyr/linker/devicetree_regions.h>
 
 // BAS includes
 #include <TargConfig.h>
@@ -24,6 +26,9 @@ extern void barracuda(void);
 extern LThreadMgr ltMgr;
 
 LOG_MODULE_REGISTER(xedge_main, LOG_LEVEL_INF);
+
+/* xedgeOpenAUX runs after the Lua thread manager has been constructed. */
+K_SEM_DEFINE(xedge_ready, 0, 1);
 
 // dlmalloc initialization. Enabled by default.
 #ifdef USE_DLMALLOC
@@ -76,8 +81,6 @@ static void xedge_error_handler(BaFatalErrorCodes ecode1,
     k_panic();
 }
 
-// xedgeOpenAUX not needed - NO_XEDGE_AUX is defined
-
 /**
  * Xedge disk I/O initialization (optional)
  * Return -1 to use NetIo instead of DiskIo
@@ -102,6 +105,8 @@ int xedgeInitDiskIo(DiskIo* dio)
 */
 int xedgeOpenAUX(XedgeOpenAUX* aux)
 {
+   ARG_UNUSED(aux);
+   k_sem_give(&xedge_ready);
    return 0; /* OK */
 }
 
@@ -164,11 +169,40 @@ int main(void)
     LOG_INF("Xedge stack size: %d bytes", BA_STACKSZ);
 #ifdef USE_DLMALLOC
     // Initialize dlmalloc heap
-    static char heap_pool[CONFIG_XEDGE_HEAP_SIZE];
+    /* Optional external heap is NOLOAD: SDRAM is initialized after BSS. */
+    static char heap_pool[CONFIG_XEDGE_HEAP_SIZE] __aligned(8)
+#if DT_HAS_CHOSEN(xedge_heap)
+        Z_GENERIC_SECTION(LINKER_DT_NODE_REGION_NAME(DT_CHOSEN(xedge_heap)))
+#endif
+        ;
+#if DT_HAS_CHOSEN(xedge_heap)
+    BUILD_ASSERT(CONFIG_XEDGE_HEAP_SIZE <= DT_REG_SIZE(DT_CHOSEN(xedge_heap)),
+                 "Xedge heap exceeds its memory region");
+#endif
+#if defined(CONFIG_BOARD_STM32F746G_DISCO)
+    if (!device_is_ready(DEVICE_DT_GET(DT_CHILD(DT_NODELABEL(fmc), sdram))))
+    {
+        LOG_ERR("Cannot initialize SDRAM for the Xedge heap");
+        k_panic();
+    }
+#endif
     init_dlmalloc(heap_pool, heap_pool + sizeof(heap_pool));
     dlmalloc_setExhaustedCB(dlmalloc_exhausted_handler);
     LOG_INF("Xedge - dlmalloc initialized - heap size: %d bytes", sizeof(heap_pool));
 #endif
+    /* Seed SharkSSL before any TLS or key-generation work starts. */
+    const struct device *entropy = DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
+    uint32_t seed[8];
+    if (!device_is_ready(entropy) ||
+        entropy_get_entropy(entropy, (uint8_t *)seed, sizeof(seed)) != 0)
+    {
+        LOG_ERR("Cannot obtain startup entropy");
+        k_panic();
+    }
+    for (size_t i = 0; i < ARRAY_SIZE(seed); ++i)
+        sharkssl_entropy(seed[i]);
+    memset(seed, 0, sizeof(seed));
+
     // Set up error handler and trace callback
     HttpServer_setErrHnd(xedge_error_handler);
     HttpTrace_setFLushCallback(xedge_trace_callback);
@@ -177,6 +211,9 @@ int main(void)
                     K_THREAD_STACK_SIZEOF(xedge_stack),
                     xedge_server_thread, NULL, NULL, NULL,
                     CONFIG_XEDGE_THREAD_PRIORITY, 0, K_NO_WAIT);
+
+    /* A fast SNTP response must not access an uninitialized ltMgr. */
+    k_sem_take(&xedge_ready, K_FOREVER);
 
     for(;;)
     {
@@ -191,6 +228,11 @@ int main(void)
           clock_settime(CLOCK_REALTIME, &ts);
           /* Initiate executing the Lua func _XedgeEvent("sntp") */
           ThreadJob* job=ThreadJob_lcreate(sizeof(ThreadJob), sntp_event);
+          if (!job)
+          {
+             LOG_ERR("Cannot allocate the SNTP notification");
+             k_panic();
+          }
           ThreadMutex* soDispMutex = HttpServer_getMutex(ltMgr.server);
           ThreadMutex_set(soDispMutex);
           LThreadMgr_run(&ltMgr, job);

@@ -1,0 +1,84 @@
+/ {
+    chosen {
+        zephyr,code-partition = &xedge_code;
+        xedge,heap = &sdram1;
+    };
+
+    zephyr_fstab {
+        compatible = "zephyr,fstab";
+        lfs_xedge: lfs_xedge {
+            compatible = "zephyr,fstab,littlefs";
+            partition = <&xedge_storage>;
+            mount-point = "/xedge";
+            automount;
+            read-size = <16>;
+            prog-size = <16>;
+            cache-size = <256>;
+            lookahead-size = <32>;
+            block-cycles = <512>;
+        };
+    };
+};
+
+&flash0 {
+    #address-cells = <1>;
+    #size-cells = <1>;
+    ranges = <0 0x08000000 DT_SIZE_M(1)>;
+    /delete-node/ partitions;
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+        xedge_code: partition@0 {
+            label = "xedge-code";
+            reg = <0 DT_SIZE_M(1)>;
+            read-only;
+        };
+    };
+};
+
+&n25q128a1 {
+    /delete-node/ partitions;
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+        /* Program the resource ZIP separately from writable application data. */
+        xedge_resources: partition@0 {
+            label = "xedge-resources";
+            reg = <0 DT_SIZE_M(2)>;
+            read-only;
+        };
+
+        xedge_storage: partition@200000 {
+            label = "xedgestorage";
+            reg = <DT_SIZE_M(2) DT_SIZE_M(14)>;
+        };
+    };
+};
+
+/* Link the ZIP at its programming address; runtime reads use flash_area_read. */
+&ext_memory {
+    reg = <0x90000000 DT_SIZE_M(2)>;
+    zephyr,memory-region = "XEDGE_RESOURCES";
+};
+
+/* The board already describes the external flash region above. */
+&quadspi_memory {
+    status = "disabled";
+};
+
+/* The browser is the demo's UI; leave SDRAM available for Xedge. */
+&ltdc {
+    status = "disabled";
+};
+
+&ft5336 {
+    status = "disabled";
+};
+
+/* Seed SharkSSL and Zephyr networking from the hardware RNG. */
+&rng {
+    status = "okay";
+};

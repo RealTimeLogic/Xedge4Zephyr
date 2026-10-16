@@ -1,0 +1,43 @@
+/* Revision C has a 16 MiB W25Q128JW. This deliberately requires EVKC. */
+/ {
+    chosen {
+        zephyr,code-partition = &xedge_code;
+    };
+
+    zephyr_fstab {
+        compatible = "zephyr,fstab";
+        lfs_xedge: lfs_xedge {
+            compatible = "zephyr,fstab,littlefs";
+            partition = <&xedge_storage>;
+            mount-point = "/xedge";
+            automount;
+            read-size = <16>;
+            prog-size = <16>;
+            cache-size = <256>;
+            lookahead-size = <32>;
+            block-cycles = <512>;
+        };
+    };
+};
+
+&w25q128jw {
+    /delete-node/ partitions;
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        /* Standalone ROM-bootable image, including the NXP boot header. */
+        xedge_code: partition@0 {
+            label = "xedge-code";
+            reg = <0x00000000 0x00400000>;
+            read-only;
+        };
+
+        /* Firmware updates must preserve this separate 12 MiB filesystem. */
+        xedge_storage: partition@400000 {
+            label = "xedgestorage";
+            reg = <0x00400000 0x00c00000>;
+        };
+    };
+};

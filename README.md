@@ -1,376 +1,224 @@
 # Xedge for Zephyr
 
-*A Lua-powered IoT and web framework for Zephyr and embedded systems.*
+Build device interfaces, network services, and application logic directly on your embedded system. Xedge brings the Barracuda App Server (BAS), Lua runtime, and a browser-based integrated development environment (IDE) to Zephyr. Keep hardware control in C and develop your Lua and Lua Server Pages (LSP) applications from the browser, without reflashing firmware for each application change.
 
-**Xedge** is a robust IoT and web framework designed specifically for microcontrollers. It's built on the **industrial-grade Barracuda Application Server (BAS)** and engineered for seamless OEM integration.
+## Choose a target
 
-Xedge accelerates embedded firmware development by providing:
+| Target | Build and run guide | Xedge heap | Application storage |
+| --- | --- | ---: | ---: |
+| Linux / WSL2 simulator | [Simulator setup below](#run-the-simulator) | 2 MiB | 1 MiB simulated flash |
+| NXP MIMXRT1060-EVKC | [Board guide](doc/mimxrt1060-evkc.md) | 70% of 32 MiB SDRAM | 12 MiB QSPI flash |
+| ST STM32F746G-DISCO | [Board guide](doc/stm32f746g-disco.md) | 70% of 8 MiB SDRAM | 14 MiB QSPI flash |
 
-- A **flexible, Lua-based environment**
-- A **full stack of industrial-strength protocols**, including:
-  - OPC UA  
-  - Modbus  
-  - MQTT  
-  - SMQ  
-  - WebSockets  
-  - HTTP / HTTPS  
-  - Embedded Web/App Server  
-
-**Product pages:**
-
-- [Xedge Toolkit](https://realtimelogic.com/products/xedge/)
-- [Barracuda Application Server C Source Code Library](https://realtimelogic.com/products/barracuda-application-server/)
-- [Xedge @ docs.zephyrproject.org](https://docs.zephyrproject.org/latest/develop/manifest/external/xedge.html)
-
----
-
-## About This Guide
-
-This guide explains how to **build and run Xedge on the Zephyr host simulator**. You can reuse the same build files for your own target and project, but we recommend first following this tutorial **exactly as written** to verify your setup and test Xedge using the **host simulator**.
+Complete the common setup below, then follow your target's guide. Once Xedge is running, continue with [Use Xedge](#use-xedge). To integrate another board, see [Adding a board](doc/adding-boards.md).
 
 ## Prerequisites
 
-Before building Xedge, ensure that you have installed the **Zephyr SDK** and **West** according to the official Zephyr installation instructions.
+Build on Linux or in WSL2 on Windows. Follow the [Zephyr setup guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) to install host tools, the Zephyr SDK, west, and a Python virtual environment. This guide uses Zephyr commit `935a5283f19197cd048dd93b40a87774a35ea9a4` (4.3.99), Zephyr SDK 1.0.0 with ARM GCC 14.3.0, west 1.5.0, and Python 3.12 or newer.
 
-Once installed, verify that you can activate the Zephyr environment by running:
+Resource generation also needs `zip`, `curl`, and a host C compiler. Install Node.js and npm if you want to minify the JavaScript and CSS resources.
+
+Activate the virtual environment created during Zephyr setup:
 
 ```bash
-$ source ~/zephyrproject/.venv/bin/activate
-(.venv) $
+# Adjust this path if you created the environment elsewhere.
+source ~/zephyrproject/.venv/bin/activate
 ```
 
-### File System Support
-
-The Xedge build configuration includes **file system support** by default. While Xedge can be built **without** a file system, having one makes it easier to develop and test Lua code directly on a running Zephyr system.
-
-If your target hardware does not support a file system, you can exclude it in your build configuration later. For now, ensure file system support **remains enabled**.
-
-When running Xedge on the **Zephyr host simulator**, Zephyr relies on **FUSE (Filesystem in Userspace)** under Linux. Because the simulator is compiled as a **32-bit application**, you must install the **32-bit FUSE developer libraries**:
+For the simulator on an x86-64 Debian/Ubuntu host, install the 32-bit FUSE development libraries and multilib compilers. FUSE exposes the simulated filesystem to the host:
 
 ```bash
+# native_sim builds as a 32-bit Linux application.
 sudo dpkg --add-architecture i386
 sudo apt-get update
 sudo apt-get install -y libfuse-dev:i386 gcc-multilib g++-multilib
 ```
 
-## Creating a Workspace
+## Creating a workspace
 
-For this guide, we'll create a new **Zephyr workspace** dedicated to building Xedge. Later, you can integrate the Xedge module into your own existing workspace.
-
-We'll name the workspace **`xedgews`**, but you can choose any name, just remember to adjust the commands accordingly.
-
-### Step 1: Create the workspace
+### 1. Initialize Zephyr
 
 ```bash
-mkdir ~/xedgews
-west init ~/xedgews
+# Create a dedicated workspace and select the Zephyr revision.
+west init -m https://github.com/zephyrproject-rtos/zephyr ~/xedgews
 cd ~/xedgews
+git -C zephyr checkout --detach 935a5283f19197cd048dd93b40a87774a35ea9a4
 west update
-# Install Python dependencies
-pip3 install -r ~/xedgews/zephyr/scripts/requirements.txt
+west zephyr-export
+python -m pip install -r zephyr/scripts/requirements.txt
 ```
 
-## Step 2: Clone the Xedge4Zephyr Repository
+If you already have a west workspace, use it instead of initializing another one. Substitute its path for `~/xedgews` in the following commands.
 
-Clone the Xedge4Zephyr repository into the `modules` directory of your workspace.
+### 2. Clone Xedge
 
 ```bash
+# Clone Xedge, then initialize its BAS runtime and Lua/web resources.
+mkdir -p ~/xedgews/modules
 cd ~/xedgews/modules
-git clone --recursive --recurse-submodules https://github.com/RealTimeLogic/Xedge4Zephyr
+git clone https://github.com/RealTimeLogic/Xedge4Zephyr
 cd Xedge4Zephyr
-git submodule update --init --remote
+git submodule update --init --recursive
 ```
 
-## Step 3: Build the Xedge Resource File
+The submodule command downloads the BAS and BAS-Resources revisions recorded by this repository so the runtime and packaged resources match. Cloning with `--recurse-submodules` performs the same initialization.
 
-A significant portion of Xedge is implemented in **Lua**. To include these Lua resources in your Zephyr build, we must:
-
-1. Build the **resource file (ZIP)**
-2. Convert the ZIP file to **C source code**
-3. Copy the generated file into the **Xedge directory**
-
-Run the following commands:
+To update an existing checkout, run:
 
 ```bash
-cd ~/xedgews/modules/Xedge4Zephyr/BAS-Resources/build/
-printf "n\nl\nn\n" | bash Xedge.sh
-cp XedgeZip.c ../../BAS/examples/xedge/
+cd ~/xedgews/modules/Xedge4Zephyr
+# Pull repository updates, then select their recorded dependency revisions.
+git pull --ff-only
+git submodule update --init --recursive
 ```
 
-The printf command is used here to automate the prompts in the Xedge.sh build script. As you become more familiar with Xedge, you'll have the flexibility to choose which modules and resources to include in the generated resource file.
+Regenerate the resources as described below and rebuild your target after updating. The submodule command follows this repository's recorded commits, rather than independently selecting each dependency's latest branch revision.
 
-### Step 4: Register the Xedge4Zephyr Module in the West Manifest
+### 3. Generate the embedded resources
 
-Edit `~/xedgews/zephyr/west.yml` and add this entry in the `projects:` section:
+Xedge's Lua modules and browser interface are packaged into a ZIP and converted into `XedgeZip.c`, which the firmware build compiles into the image:
 
-```yaml
-manifest:
-  projects:
-    # ... other projects ...
-    
-    - name: xedge
-      path: modules/Xedge4Zephyr
-      revision: main
-      url: .
+```bash
+cd ~/xedgews/modules/Xedge4Zephyr/BAS-Resources/build
+# Exclude OPC UA, use the large CA store, and skip JS/CSS minification.
+unset USE_OPCUA XedgeCaStore NO_BIN2C
+printf 'n\nl\nn\n' | bash Xedge.sh &&
+  cp XedgeZip.c ../../BAS/examples/xedge/XedgeZip.c
 ```
 
-**Important**: The `url: .` means local module (not from GitHub or remote repo)
+The certificate authority (CA) store supplies trusted roots for outgoing Transport Layer Security (TLS) connections. To choose other resource options, run `bash Xedge.sh` interactively and copy the resulting `XedgeZip.c` to the same location. Regenerate it after changing BAS-Resources or its packaging options; edit the resource sources rather than the generated C file.
 
-### Step 5: Update West
+### 4. Build your target
 
-Now update west to register the module:
+For hardware, continue with the [NXP](doc/mimxrt1060-evkc.md#build) or [STM32](doc/stm32f746g-disco.md#build) instructions. For the simulator:
 
 ```bash
 cd ~/xedgews
-west update
-```
-
-You should see: `=== updating xedge (modules/Xedge4Zephyr):`
-
-## Building Xedge
-
-To build Xedge for the first time (or after a **pristine** clean), run:
-
-```bash
-# Ensure pkg-config can find the 32-bit FUSE .pc files
+# Let pkg-config find the simulator's 32-bit FUSE library.
 export PKG_CONFIG_PATH="/usr/lib/i386-linux-gnu/pkgconfig:${PKG_CONFIG_PATH}"
-# From your workspace root (~/xedgews)
-west build -b native_sim modules/Xedge4Zephyr/XedgeInit \
-  -- -DDTC_OVERLAY_FILE="$PWD/modules/Xedge4Zephyr/XedgeInit/boards/native_sim.overlay"
+west build -d build-native -b native_sim modules/Xedge4Zephyr/XedgeInit -- \
+  -DEXTRA_ZEPHYR_MODULES="$PWD/modules/Xedge4Zephyr"
 ```
 
-**Note:** The Zephyr native simulator is built as a 32-bit app; the FUSE developer package you installed (libfuse-dev:i386) places its fuse.pc in /usr/lib/i386-linux-gnu/pkgconfig. Exporting PKG_CONFIG_PATH allows pkg-config (invoked during the build) to locate FUSE, avoiding link/compile errors.
+`EXTRA_ZEPHYR_MODULES` adds this checkout to Zephyr's module list. If Xedge is outside the workspace, use its absolute path for both the application and module arguments. In WSL, a Windows path such as `C:\projects\Xedge4Zephyr` becomes `/mnt/c/projects/Xedge4Zephyr`.
 
-The FUSE/file system initialization for the simulator is configured in
-Xedge4Zephyr/XedgeInit/boards/native_sim.overlay.
+Keep a separate build directory for each target. Zephyr loads the target's `.conf` and `.overlay` files from `XedgeInit/boards/`. Use a new build directory when switching targets or checkouts. For subsequent builds, run `west build -d build-native`, or substitute the hardware build directory.
 
-If the build completes without errors, subsequent incremental builds are simply:
+## Run the simulator
+
+### Connect its virtual network
+
+The simulator uses `10.200.200.2`. The host's `zeth` virtual Ethernet interface uses `10.200.200.1` and routes simulator traffic to the host network.
+
+Copy the interface configuration once:
 
 ```bash
-west build
+# Run after west update has installed tools/net-tools.
+cp ~/xedgews/modules/Xedge4Zephyr/zeth.conf ~/xedgews/tools/net-tools/zeth.conf
 ```
 
-## Running Xedge
-
-After a successful build, run Xedge with:
-
-```bash
-west build -t run
-```
-
-On the first launch in the simulator, you'll likely see LittleFS report an error and then auto-format:
-
-```
-<wrn> littlefs: can't mount (LFS -84); formatting
-```
-
-This is expected the first time the simulated flash is empty or uninitialized.
-After formatting, the file system will mount normally and subsequent runs won't show this warning.
-
-You will also see the following error:
-
-```
-<err> xedge_main: NTP sync failed: -101. Did you configure your network?
-```
-
-The reason you're seeing the NTP sync error is because the file `modules/Xedge4Zephyr/XedgeInit/src/main.c` tries to fetch time from the Internet, but the zeth interface hasn't been started and NAT isn't configured yet.
-
-### Configure `zeth`
-
-The zeth interface is a virtual Ethernet device that connects the Zephyr simulator to the host's network. It lets the simulated system exchange IP traffic with external networks through the host. Because the simulator runs in a virtual environment without direct Internet access, zeth works together with NAT (Network Address Translation) on the host to route and translate packets so Zephyr can communicate with the outside world as if it were real hardware.
-
-Our setup requires modifications to the default `zeth.conf` configuration file. Do the following only one time:
-
-```bash
-mv modules/Xedge4Zephyr/zeth.conf tools/net-tools/zeth.conf
-```
-
-#### Start the zeth interface:
-
-
-
+Start the interface and enable routing and Network Address Translation (NAT) before launching the simulator:
 
 ```bash
 sudo ~/xedgews/tools/net-tools/net-setup.sh start
+# Uses the host's default outbound interface and gateway.
+sudo bash ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
+cd ~/xedgews
+west build -d build-native -t run
 ```
 
-#### Create two routing tables
-
-Edit `/etc/iproute2/rt_tables` and add the two lines:
-
-```
-100 zeth
-200 eth0    or enp0s3, wlp2s0, etc. (details below)
-```
-
-#### Configure NAT:
-
-The script auto-detects both the outbound interface and its default gateway, so in the common case you can simply run:
+The gateway script enables IPv4 forwarding, adds firewall rules, and uses routing tables 100 and 200. If your host already uses those tables, choose unused IDs in the script. To override network detection, pass `WAN_IFACE` (interface name) and `LAN_DEFAULT_GW` (gateway IPv4 address) as strings:
 
 ```bash
-chmod +x ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
-sudo ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
+# Replace these example values with those shown by ip route.
+sudo env WAN_IFACE=eth0 LAN_DEFAULT_GW=192.168.1.1 \
+  bash ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
 ```
 
-If auto-detection does not pick the correct values on your system, set these optional overrides before running the script:
+On Linux, open [the Xedge IDE](http://10.200.200.2/rtl/). On WSL2, use one of the access methods below.
+
+### Open it from Windows with WSL2
+
+For browser access through a local forwarder, install `socat` and run this in a separate WSL terminal:
 
 ```bash
-export WAN_IFACE=<iface>
-export LAN_DEFAULT_GW=<ip-addr>
-sudo ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
+sudo apt-get install -y socat
+# Keep this process running while using the IDE.
+socat TCP-LISTEN:8090,fork,reuseaddr TCP:10.200.200.2:80
 ```
 
-To find your network interface, run: `ip a`. Look for something like `eth0`, `enp0s3`, or `wlp2s0`.
+Open [Xedge through localhost](http://localhost:8090/rtl/). If Windows-to-WSL localhost forwarding is disabled, use `http://<wsl-ip>:8090/rtl/`; find the WSL IPv4 address with `ip -4 addr show eth0`.
 
-To find the gateway for that interface, run: `ip route`.
+For direct access to all simulator ports, add a Windows route instead. Run this in an Administrator PowerShell, replacing the example address with the WSL IPv4 address:
 
-**Note:** Auto-detection works for both regular Linux and Windows Subsystem for Linux (**WSL2**). The environment variables are only needed when you want to override the detected interface or gateway.
-
-## Running Xedge with Configured NAT Network
-
-```
-west build -t run
-
-### Printouts you should see
-
-FUSE mounting flash in host flash/
-WARNING: Using a test - not safe - entropy source
-uart connected to pseudotty: /dev/pts/1
-[00:00:00.000,000] <inf> littlefs: littlefs partition at /xedge
-[00:00:00.000,000] <inf> littlefs: LittleFS version 2.11, disk version 2.1
-[00:00:00.000,000] <inf> littlefs: FS at flash-controller@0:0x0 is 256 0x1000-byte blocks with 512 cycle
-[00:00:00.000,000] <inf> littlefs: partition sizes: rd 16 ; pr 16 ; ca 64 ; la 32
-[00:00:00.000,000] <inf> littlefs: Automount /xedge succeeded
-*** Booting Zephyr OS build v4.2.0-6017-g86a46c48bee5 ***
-[00:00:00.000,000] <inf> net_config: Initializing network
-[00:00:00.000,000] <inf> net_config: IPv4 address: 10.200.200.2
-[00:00:00.000,000] <inf> xedge_main: Xedge application starting...
-[00:00:00.000,000] <inf> xedge_main: Board: native_sim
-[00:00:00.000,000] <inf> xedge_main: Xedge stack size: 16384 bytes
-[00:00:00.000,000] <inf> xedge_main: Xedge - dlmalloc initialized - heap size: 2097152 bytes
-[00:00:00.000,000] <inf> xedge_main: Starting the Xedge main loop
-[00:00:00.000,000] <inf> xedge_main: main.c - xedgeInitDiskIo: Mounting /xedge
-[00:00:00.000,000] <inf> xedge_main: Xedge: Server listening on IPv6 port 80
-[00:00:00.000,000] <inf> xedge_main: Xedge: Server listening on IPv4 port 80
-[00:00:00.000,000] <inf> xedge_main: Xedge: SharkSSL server listening on IPv6 port 443
-[00:00:00.000,000] <inf> xedge_main: Xedge: SharkSSL server listening on IPv4 port 443
-[00:00:00.000,000] <err> fs: file open error (-2)
-[00:00:00.000,000] <inf> xedge_main: Xedge: Configuration file: /xedge/xcfg.bin: noaccess
-[00:00:30.250,000] <inf> xedge_main: Uptime: 30 seconds
-[00:01:00.260,000] <inf> xedge_main: Uptime: 60 seconds
+```powershell
+# Refresh this route if WSL's address changes after a restart.
+route add 10.200.200.0 mask 255.255.255.252 172.29.54.156
 ```
 
-**Note:** You see the `xcfg.bin` error because you have not yet created this file using the Xedge IDE. On the initial startup, you will also see a file system error before the simulator performs a clean format of the disk. This is expected the first time you run the image, and it can also happen again if you delete the build directory and rebuild.
+Then open [the simulator IDE](http://10.200.200.2/rtl/).
 
-To verify that Xedge is running and accessible, open a **separate terminal** and run:
+### Storage and startup
+
+The first boot formats empty simulated flash as LittleFS and mounts it at `/xedge`. Keep the flash backing file and use the same run directory to retain applications and settings across restarts. A missing `xcfg.bin` message disappears after you save Xedge settings.
+
+The application obtains the time from `pool.ntp.org` using SNTP. If time synchronization fails, check the host routing, DNS, and outbound UDP port 123. Accurate time is needed for certificate validation. The simulator uses test entropy and is intended for development.
+
+## Use Xedge
+
+Open `http://<device-ip>/rtl/`, using the address printed by the board's serial console or `10.200.200.2` for the simulator. The browser IDE lets you edit files and start or stop applications on the device. Files saved in the disk filesystem are stored under `/xedge` in LittleFS.
+
+### Create your first web application
+
+1. Expand the disk filesystem in the left pane. Right-click it and select **New Folder**; name the folder `hello`.
+2. Right-click `hello` and select **New App**. Set **Name** to `hello`, enable **LSP App**, and set **Directory Name** to `hello`. Leave **Domain Name** empty and save.
+3. Create `index.lsp` in that folder and save the following content:
+
+```html
+<!-- Lua inside the LSP tag runs on the device for each request. -->
+<!doctype html>
+<html lang="en">
+<title>Hello from Xedge</title>
+<h1>Hello from Xedge</h1>
+<p>The device calculated 6 &times; 7 = <?lsp= 6 * 7 ?>.</p>
+</html>
+```
+
+4. Open the application's configuration, turn **Running** on, and save. Visit `/hello/index.lsp` on the same host and port used for the IDE.
+5. Edit the page, save, and refresh the browser to see the change. Enable **Auto Start** when you want the application to start after a device restart.
+
+Use `.preload` for application initialization and `.xlua` files for Lua programs that start with the application. Use LSP pages for HTML generated on the device. The [Xedge user guide](https://realtimelogic.com/ba/doc/en/Xedge.html) explains application lifecycle, ZIP deployment, file access, and the IDE controls.
+
+### Configure HTTPS and access
+
+HTTPS listens on port 443. The initial demonstration certificate causes a browser trust warning. Open the IDE over HTTP for initial setup. For automatic certificates, open the three-dot menu and select **TLS Certificate**, supply an email address and device name, and save. Leave **Let's Encrypt Staging** off to obtain a browser-trusted certificate; staging certificates are for development. The device needs working DNS, Internet access, and a synchronized clock. Open the assigned HTTPS hostname after issuance completes.
+
+Use **Authentication** in the same menu to configure IDE users. Follow the [Xedge configuration guide](https://realtimelogic.com/ba/doc/en/Xedge.html#conf) for certificate and authentication options, including the keys and service configuration needed for product deployment.
+
+### Connect Lua to your firmware
+
+Add C-to-Lua bindings in `xedgeOpenAUX()` in [XedgeInit/src/main.c](XedgeInit/src/main.c) to expose sensors, device controls, or existing firmware services. Keep the startup synchronization in that function. Examples are provided in [led.c](BAS/examples/xedge/src/led.c) and [AsynchLua.c](BAS/examples/xedge/src/AsynchLua.c).
+
+Follow the [Lua binding tutorial](https://tutorial.realtimelogic.com/Lua-Bindings.lsp) to create bindings, then use them from your Xedge applications. The [online Lua tutorials](https://tutorial.realtimelogic.com/) cover web applications, network clients, messaging, and other BAS APIs.
+
+## Configure the firmware
 
 ```bash
-wget http://10.200.200.2/rtl/
+# Substitute your hardware build directory when configuring a board.
+west build -d build-native -t menuconfig
 ```
 
-This command downloads the Xedge IDE (HTML code), confirming that the server is up and responding.
+Search for `XEDGE` with `/`. Save permanent settings in `XedgeInit/prj.conf` for all targets or in the target's `XedgeInit/boards/*.conf` for one board.
 
+| Setting | Type and default | Use |
+| --- | --- | --- |
+| `CONFIG_XEDGE_HEAP_SIZE` | Integer bytes; 2,097,152 | BAS/Lua heap; hardware boards override this to 70% of their SDRAM |
+| `CONFIG_XEDGE_STACK_SIZE` | Integer bytes; 24,000 | Xedge server stack and BAS thread stack size |
+| `CONFIG_XEDGE_MAX_THREADS` | Integer; 2, range 1 to 10 | BAS server worker limit |
+| `CONFIG_XEDGE_THREAD_PRIORITY` | Integer; 5, range 2 to 15 | Server priority; smaller numbers mean higher priority |
+| `CONFIG_XEDGE_ENABLE_DISK_IO` | Boolean; `y` with filesystem support | Store applications and settings in `/xedge` |
+| `CONFIG_XEDGE_ENABLE_DEBUGGER` | Boolean; `y` | Lua debugger support |
+| `CONFIG_XEDGE_ENABLE_ENCRYPTION_KEY` | Boolean; `y` | Configuration encryption support; configure your product key in `BAS/examples/xedge/src/EncryptionKey.h` |
+| `CONFIG_XEDGE_ENABLE_SHARKTRUST` | Boolean; `y` | SharkTrustX certificate service integration; configure the service token in `BAS/examples/xedge/src/tokengen.c` |
 
-## Accessing the Xedge IDE
-
-If you are running **standard Linux (not WSL2)**, simply open your browser and go to: `http://10.200.200.2`
-
-You should see the **Xedge IDE** load in your browser.
-
-## Accessing Xedge via WSL2
-
-When using **WSL2**, networking is slightly more complex because it runs behind a **double NAT**. The Zephyr simulator creates a virtual interface named **`zeth`**, which is not directly reachable from Windows. To fix this, you can connect to Xedge in one of two ways:
-
----
-
-### **Option 1: Set Up Routing (Recommended)**
-
-1. Open **PowerShell** as an Administrator.  
-2. Run the following command (replace the IP address with your current WSL2 host IP if different):
-
-   ```powershell
-   route add 10.200.200.0 mask 255.255.255.252 172.29.54.156
-   ```
-
-This creates a route from Windows to the zeth network interface inside WSL2. You should now be able to directly access Xedge from your Windows browser at: `http://10.200.200.2`
-
-
-### Option 2: Set Up a Tunnel
-
-If routing doesn't work or you prefer a quick alternative, you can create a TCP tunnel using socat.
-
-Open a new WSL2 terminal. Run the following command (install socat if you don't already have it):
-
-```bash
-sudo socat -d -d TCP-LISTEN:8090,fork,reuseaddr TCP:10.200.200.2:80
-```
-
-This forwards traffic from port 8090 on the WSL2 host to the Xedge simulator's port 80.
-
-You can now access Xedge from Windows via your WSL2 IP (for example, 172.29.54.156) - e.g. `http://172.29.54.156:8090/rtl/`
-
-
-**Tip:** You can find your WSL2 IP address by running the following in a WSL2 console:
-
-```
-ip addr show eth0
-```
-
-## Quick Rebuild and Run
-
-If you have already completed a successful build and want to restart the simulated environment, you can copy and paste the following commands into your Linux shell:
-
-``` bash
-source ~/zephyrproject/.venv/bin/activate
-sudo ~/xedgews/tools/net-tools/net-setup.sh start
-sleep 3
-sudo ~/xedgews/modules/Xedge4Zephyr/setup-gateway.sh
-cd xedgews
-west build -t run
-```
-
-## Troubleshooting: Flash Mount Point Error
-
-You may occasionally see the following error when starting the simulator:
-
-``` console
-Failed to create directory for flash mount point (flash): File exists
-```
-
-When this happens, the simulator may exit immediately. In most cases, simply rerunning the command resolves the issue.
-
-## Xedge Menuconfig Options
-
-You can inspect and change the Xedge-specific configuration options by running:
-
-```bash
-west build -t menuconfig
-```
-
-In the menuconfig UI, press `/` and search for `xedge` to jump to the available options.
-
-The most important Xedge options are:
-
-- `XEDGE`: Master enable switch for the Xedge module.
-- `XEDGE_THREAD_PRIORITY`: Zephyr thread priority used for the Xedge server thread(s).
-- `XEDGE_ENABLE_DISK_IO`: Enables filesystem-backed storage under `/xedge`. Disable this for a no-filesystem build.
-- `XEDGE_HEAP_SIZE`: Xedge (BAS) uses its own included dlmalloc allocator. This is the heap reserved for Xedge at startup in [main.c](XedgeInit/src/main.c). See the [porting](https://realtimelogic.com/ba/doc/en/introduction.html#porting) section in the documentation for memory requirements.
-- `XEDGE_ENABLE_ENCRYPTION_KEY`: Enables support for your device-specific encryption key.
-- `XEDGE_ENABLE_SHARKTRUST`: Enables SharkTrustX support.
-- `XEDGE_MAX_THREADS`: Sets the maximum number of concurrent Xedge server threads.
-
-## What's Next
-
-Now that Xedge is running in the simulator, the next step is to connect Xedge to your firmware.
-
-In a typical Xedge-based design, low-level and performance-critical code stays in C, while higher-level device logic is implemented in Lua. To make this work, you expose selected firmware APIs to Lua by creating Lua bindings for the C functions your application needs, such as sensor access, device control, configuration, fieldbus access, or product-specific services.
-
-In this project, the intended place to add those bindings is `XedgeInit/src/main.c` in the `xedgeOpenAUX()` function. You can also study `BAS/examples/xedge/src/led.c` and `BAS/examples/xedge/src/AsynchLua.c` for binding examples.
-
-Start with the Lua binding tutorial:
-- https://tutorial.realtimelogic.com/Lua-Bindings.lsp
-
-For a higher-level explanation of why Xedge uses Lua on top of C in embedded systems, see:
-- https://realtimelogic.com/articles/Using-Lua-for-Embedded-Development-vs-Traditional-C-Code
-
-Once your firmware APIs are exposed to Lua, you can use the [Xedge IDE](https://realtimelogic.com/ba/doc/en/Xedge.html) and the [online Lua tutorials](https://tutorial.realtimelogic.com/) to build the product-specific application logic on top of those bindings.
+Xedge's heap is separate from Zephyr's heap, network pools, and static thread stacks. Keep the DNS socket-service thread at a higher priority than BAS threads; the shared configuration uses priorities 2 and 5 respectively. See [Adding a board](doc/adding-boards.md) for memory placement and storage configuration.

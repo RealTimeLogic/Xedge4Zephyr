@@ -54,7 +54,7 @@ config XEDGE_ENABLE_ENCRYPTION_KEY
 	default y
 	help
 	  When enabled, create your own secret encryption key.
-          See BAS/examples/xedge/src/EncryptionKey.h 
+          See BAS/examples/xedge/src/EncryptionKey.h
 
 config XEDGE_ENABLE_SHARKTRUST
 	bool "Enable SharkTrustX"
@@ -83,6 +83,17 @@ config XEDGE_MAX_THREADS
 	range 1 10
 	help
 	  Maximum number of concurrent threads for the server.
+
+config XEDGE_RESOURCE_FLASH
+	bool "Read the embedded Xedge resource ZIP through the flash driver"
+	default n
+	depends on FLASH_MAP
+	help
+	  Store the generated XedgeZip.c payload in the XEDGE_RESOURCES linker
+	  memory region and read it through the xedge_resources flash partition.
+	  The board must provide both at the same external flash offset. Use
+	  HEX or ELF output when program and resources occupy distant addresses.
+	  Default: disabled; the generated memory ZIP reader is used instead.
 
 
 

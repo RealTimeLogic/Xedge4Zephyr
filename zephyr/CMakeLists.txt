@@ -36,6 +36,15 @@ zephyr_library_sources(
   ${CMAKE_CURRENT_LIST_DIR}/../BAS/examples/xedge/XedgeZip.c
 )
 
+# Preserve the generated ZIP bytes while replacing its direct-memory reader.
+if(CONFIG_XEDGE_RESOURCE_FLASH)
+  set_property(SOURCE ${CMAKE_CURRENT_LIST_DIR}/../BAS/examples/xedge/XedgeZip.c
+    TARGET_DIRECTORY zephyr APPEND PROPERTY COMPILE_DEFINITIONS
+    getLspZipReader=xedge_unused_memory_zip_reader)
+  zephyr_library_sources(src/flash_zip.c)
+  zephyr_linker_sources(ROM_SECTIONS xedge_resources.ld)
+endif()
+
 # Optional: File system support (only if CONFIG_XEDGE_ENABLE_DISK_IO is set)
 if(CONFIG_XEDGE_ENABLE_DISK_IO AND CONFIG_FILE_SYSTEM)
   zephyr_library_sources(
