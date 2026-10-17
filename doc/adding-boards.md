@@ -14,6 +14,7 @@ Plan separate storage for firmware, embedded Xedge resources, and writable appli
 
 | Example | Firmware and resources | Xedge heap | Writable files |
 | --- | --- | --- | --- |
+| [MIMXRT1020-EVK](mimxrt1020-evk.md#memory-and-storage) | Code and resources in QSPI; flash driver and controller configuration in internal instruction RAM | 70% of 32 MiB SDRAM | Separate 4 MiB QSPI partition |
 | [MIMXRT1060-EVKC](mimxrt1060-evkc.md#memory-and-storage) | Code and resources in QSPI; flash driver relocated to internal instruction RAM | 70% of 32 MiB SDRAM | Separate 12 MiB QSPI partition |
 | [STM32F746G-DISCO](stm32f746g-disco.md#memory-and-storage) | Code in internal flash; resources read through the QSPI driver | 70% of 8 MiB SDRAM | Separate 14 MiB QSPI partition |
 
@@ -61,7 +62,7 @@ The default build embeds the generated `XedgeZip.c` resource ZIP alongside the f
 4. Use the [flash ZIP reader](../zephyr/src/flash_zip.c), which reads through `flash_area_read()` and retains its reader and descriptor for the server's lifetime. The flash driver must serialize resource reads with filesystem writes.
 5. Generate HEX or ELF when firmware and resources occupy distant addresses. Configure the programmer and external loader to write both regions.
 
-When code executes from the same flash chip used for writable files, configure the flash driver and any required code/data relocation so erase and write operations can run without reading the busy flash. Check interrupt, logging, and cache requirements in the selected Zephyr driver. The NXP configuration demonstrates this arrangement.
+When code executes from the same flash chip used for writable files, configure the flash driver and any required code/data relocation so erase and write operations can run without reading the busy flash. Check interrupt, logging, and cache requirements in the selected Zephyr driver. The NXP configurations demonstrate this arrangement: Zephyr relocates the FlexSPI driver code, and [XedgeInit/CMakeLists.txt](../XedgeInit/CMakeLists.txt) also relocates the controller's constant configuration.
 
 ## 5. Build and run
 

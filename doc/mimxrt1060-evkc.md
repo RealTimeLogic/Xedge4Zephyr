@@ -53,6 +53,6 @@ floor((32 * 1024 * 1024 * 70 / 100) / 8) * 8 = 23,488,096 bytes
 
 BAS worker stacks come from this heap. Zephyr's heap, static stacks, and network pools use additional RAM. This setting applies only to the EVKC; the simulator keeps its 2 MiB heap.
 
-Code and embedded resources are read directly from QSPI flash. Flash-writing code runs from ITCM so the filesystem can use the same flash device as the firmware. Keep the flash-driver relocation and disabled flash/controller logging settings when modifying this layout.
+Code and embedded resources are read directly from QSPI flash. Flash-writing code and the controller's constant configuration use ITCM so the filesystem can use the same flash device as the firmware. Keep the relocation in [CMakeLists.txt](../XedgeInit/CMakeLists.txt), the flash-driver relocation settings, and disabled flash/controller logging when modifying this layout.
 
 `CONFIG_USE_DT_CODE_PARTITION` limits firmware to its 4 MiB partition. The LittleFS cache setting is 256 bytes in both Kconfig and the overlay; keep them equal when changing filesystem parameters. To adjust capacity or move a partition, update the overlay and check the resulting `zephyr.dts` and `zephyr.map` files.

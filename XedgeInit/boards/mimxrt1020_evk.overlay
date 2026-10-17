@@ -1,0 +1,53 @@
+/ {
+    chosen {
+        zephyr,code-partition = &xedge_code;
+    };
+
+    zephyr_fstab {
+        compatible = "zephyr,fstab";
+        lfs_xedge: lfs_xedge {
+            compatible = "zephyr,fstab,littlefs";
+            partition = <&xedge_storage>;
+            mount-point = "/xedge";
+            automount;
+            read-size = <16>;
+            prog-size = <16>;
+            cache-size = <256>;
+            lookahead-size = <32>;
+            block-cycles = <512>;
+        };
+    };
+};
+
+&is25lp064 {
+    /delete-node/ partitions;
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        /* ROM-bootable firmware, including the NXP boot header. */
+        xedge_code: partition@0 {
+            label = "xedge-code";
+            reg = <0x00000000 0x00400000>;
+            read-only;
+        };
+
+        /* Preserve this partition when updating firmware. */
+        xedge_storage: partition@400000 {
+            label = "xedgestorage";
+            reg = <0x00400000 0x00400000>;
+        };
+    };
+};
+
+/* Keep the Ethernet identity stable across reboots for DHCP and DNS. */
+&enet_mac {
+    /delete-property/ zephyr,random-mac-address;
+    nxp,unique-mac;
+};
+
+/* Use the PHY driver's periodic link monitor. */
+&phy {
+	/delete-property/ int-gpios;
+};

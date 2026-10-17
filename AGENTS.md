@@ -1,12 +1,13 @@
 # Working on Xedge4Zephyr
 
-This repository runs the Barracuda App Server (BAS) and Xedge Lua application environment on Zephyr. Start with the [README](README.md) for setup and usage, the [NXP](doc/mimxrt1060-evkc.md) and [STM32](doc/stm32f746g-disco.md) guides for hardware, and [Adding a board](doc/adding-boards.md) for porting.
+This repository runs the Barracuda App Server (BAS) and Xedge Lua application environment on Zephyr. Start with the [README](README.md) for setup and usage, the [RT1020](doc/mimxrt1020-evk.md), [RT1060](doc/mimxrt1060-evkc.md), and [STM32](doc/stm32f746g-disco.md) guides for hardware, and [Adding a board](doc/adding-boards.md) for porting.
 
 ## Repository map
 
 | Path | Purpose |
 | --- | --- |
 | `XedgeInit/src/main.c` | Heap and entropy initialization, startup, `/xedge` filesystem root, time synchronization, and `xedgeOpenAUX()` Lua binding hook |
+| `XedgeInit/CMakeLists.txt` | Application entry point and RAM relocation of FlexSPI controller constants for XIP targets |
 | `XedgeInit/prj.conf` | Shared application configuration |
 | `XedgeInit/boards/*.conf` | Per-board driver and resource settings |
 | `XedgeInit/boards/*.overlay` | Devices, RAM placement, flash partitions, and filesystem mounts |
@@ -24,6 +25,7 @@ Follow the [common setup](README.md#creating-a-workspace) to install dependencie
 | Target | Build directory |
 | --- | --- |
 | `native_sim` | `build-native` |
+| `mimxrt1020_evk` | `build-rt1020` |
 | `mimxrt1060_evk@C/mimxrt1062/qspi` | `build-evkc` |
 | `stm32f746g_disco` | `build-stm32f746` |
 
@@ -41,7 +43,7 @@ Confirm application and module paths in `CMakeCache.txt` when multiple checkouts
 
 ## Checking changes
 
-Build the affected target after board changes. After shared C, CMake, Kconfig, or dependency changes, build all three targets and exercise the affected behavior in the simulator. Use hardware for peripheral-dependent changes. Inspect the resolved configuration, devicetree, and map when changing memory or storage placement.
+Build the affected target after board changes. After shared C, CMake, Kconfig, or dependency changes, build all listed targets and exercise the affected behavior in the simulator. Use hardware for peripheral-dependent changes. Inspect the resolved configuration, devicetree, and map when changing memory or storage placement.
 
 For documentation changes, check commands against source, links and anchors, Markdown fences, and `git diff --check`; no firmware rebuild is needed. Public documentation should explain setup, use, configuration, and porting. Keep test histories, debug narratives, temporary helpers, and local results under ignored `build/` or outside the repository.
 

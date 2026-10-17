@@ -13,6 +13,7 @@ Build device interfaces, network services, and application logic directly on you
 | Target | Build and run guide | Xedge heap | Application storage |
 | --- | --- | ---: | ---: |
 | Linux / WSL2 simulator | [Simulator setup below](#run-the-simulator) | 2 MiB | 1 MiB simulated flash |
+| NXP MIMXRT1020-EVK | [Board guide](doc/mimxrt1020-evk.md) | 70% of 32 MiB SDRAM | 4 MiB QSPI flash |
 | NXP MIMXRT1060-EVKC | [Board guide](doc/mimxrt1060-evkc.md) | 70% of 32 MiB SDRAM | 12 MiB QSPI flash |
 | ST STM32F746G-DISCO | [Board guide](doc/stm32f746g-disco.md) | 70% of 8 MiB SDRAM | 14 MiB QSPI flash |
 
@@ -96,7 +97,7 @@ The certificate authority (CA) store supplies trusted roots for outgoing Transpo
 
 ### 4. Build your target
 
-For hardware, continue with the [NXP](doc/mimxrt1060-evkc.md#build) or [STM32](doc/stm32f746g-disco.md#build) instructions. For the simulator:
+For hardware, continue with the [RT1020](doc/mimxrt1020-evk.md#build), [RT1060](doc/mimxrt1060-evkc.md#build), or [STM32](doc/stm32f746g-disco.md#build) instructions. For the simulator:
 
 ```bash
 cd ~/xedgews
