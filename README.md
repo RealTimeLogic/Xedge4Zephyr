@@ -10,6 +10,8 @@ Build device interfaces, network services, and application logic directly on you
 
 ## Choose a target
 
+We recommend at least **2 MiB for the Xedge heap**, with additional RAM for Zephyr and your native application. The example settings below reserve generous heaps to give you room for larger Lua applications and many concurrent HTTPS connections. You can tune this allocation to your product's needs with `CONFIG_XEDGE_HEAP_SIZE` (in bytes) in your board's configuration. See [Configure the firmware](#configure-the-firmware).
+
 | Target | Build and run guide | Xedge heap | Application storage |
 | --- | --- | ---: | ---: |
 | Linux / WSL2 simulator | [Simulator setup below](#run-the-simulator) | 2 MiB | 1 MiB simulated flash |
