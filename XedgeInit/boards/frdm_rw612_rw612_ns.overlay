@@ -1,0 +1,80 @@
+/*
+ * PSRAM pin and RX-buffer configuration follows NXP's memc sample.
+ * Copyright 2026 NXP
+ * Copyright 2026 Real Time Logic
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
+#include "frdm_rw612_memory.h"
+
+/ {
+    chosen {
+        xedge,heap = &xedge_psram;
+    };
+
+    xedge_psram: memory@c000000 {
+        compatible = "zephyr,memory-region";
+        reg = <0x0c000000 DT_SIZE_M(8)>;
+        zephyr,memory-region = "XEDGE_PSRAM";
+        zephyr,memory-region-flags = "rw";
+        zephyr,memory-attr = <DT_MEM_ARM_MPU_RAM>;
+    };
+
+    zephyr_fstab {
+        compatible = "zephyr,fstab";
+        lfs_xedge: lfs_xedge {
+            compatible = "zephyr,fstab,littlefs";
+            partition = <&xedge_storage>;
+            mount-point = "/xedge";
+            automount;
+            read-size = <16>;
+            prog-size = <16>;
+            cache-size = <256>;
+            lookahead-size = <32>;
+            block-cycles = <512>;
+        };
+    };
+};
+
+&w25q512jvfiq {
+    partitions {
+        xedge_storage: partition@1000000 {
+            label = "xedgestorage";
+            reg = <XEDGE_STORAGE_OFFSET XEDGE_STORAGE_SIZE>;
+        };
+    };
+};
+
+&ext_flash_ctrl {
+    spi-max-frequency = <109000000>;
+};
+
+&aps6404l {
+    status = "okay";
+};
+
+&pinctrl {
+    pinmux_flexspi_safe: pinmux-flexspi-safe {
+        group0 {
+            pinmux = <IO_MUX_QUAD_SPI_PSRAM_IO35
+                      IO_MUX_QUAD_SPI_PSRAM_IO36
+                      IO_MUX_QUAD_SPI_PSRAM_IO38
+                      IO_MUX_QUAD_SPI_PSRAM_IO39
+                      IO_MUX_QUAD_SPI_PSRAM_IO40
+                      IO_MUX_QUAD_SPI_PSRAM_IO41>;
+            slew-rate = "normal";
+        };
+        group1 {
+            pinmux = <IO_MUX_QUAD_SPI_PSRAM_IO37>;
+            slew-rate = "normal";
+            bias-pull-down;
+        };
+    };
+};
+
+&flexspi {
+    pinctrl-0 = <&pinmux_flexspi_safe>;
+    pinctrl-names = "default";
+    rx-buffer-config = <1 0 10 512>, <0 0 0 0>, <0 0 0 0>, <0 0 0 0>,
+                       <0 0 0 0>, <0 0 0 0>, <0 0 0 0>, <1 0 0 512>;
+};

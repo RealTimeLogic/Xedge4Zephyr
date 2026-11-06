@@ -1,0 +1,12 @@
+diff --git a/drivers/memc/memc_mcux_flexspi.c b/drivers/memc/memc_mcux_flexspi.c
+--- a/drivers/memc/memc_mcux_flexspi.c
++++ b/drivers/memc/memc_mcux_flexspi.c
+@@ -388,7 +388,7 @@ static int memc_flexspi_init(const struct device *dev)
+ #endif
+ 
+ 	/* Configure AHB RX buffers, if any configuration settings are present */
+-	__ASSERT(data->buf_cfg_cnt < FSL_FEATURE_FLEXSPI_AHB_BUFFER_COUNT,
++	__ASSERT(data->buf_cfg_cnt <= FSL_FEATURE_FLEXSPI_AHB_BUFFER_COUNT,
+ 		"Maximum RX buffer configuration count exceeded");
+ 	for (i = 0; i < data->buf_cfg_cnt; i++) {
+ 		/* Should AHB prefetch up to buffer size? */

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 - 2026 Real Time Logic
  * Xedge (xedge.c) and Barracuda App Server (BAS) initialization and startup code for the Zephyr RTOS
- * Targets: native_sim, MIMXRT1060-EVKC, and STM32F746G-DISCO
+ * Targets: native_sim, NXP i.MX RT, FRDM-RW612, and STM32F746G-DISCO
  */
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
@@ -30,8 +30,20 @@ LOG_MODULE_REGISTER(xedge_main, LOG_LEVEL_INF);
 /* xedgeOpenAUX runs after the Lua thread manager has been constructed. */
 K_SEM_DEFINE(xedge_ready, 0, 1);
 
+#if SHARKSSL_PSA_CONSUMER
+#include <psa/crypto.h>
+
+/* TF-M has initialized its secure storage before entering Zephyr. Xedge calls
+ * this hook before resource verification and Lua TPM initialization.
+ */
+int xedgeInitPsa(void)
+{
+   return (int)psa_crypto_init();
+}
+#endif
+
 // dlmalloc initialization. Enabled by default.
-#ifdef USE_DLMALLOC
+#if BA_ALLOCATOR == BA_ALLOCATOR_DLMALLOC
 #include <dlmalloc.h>
 
 static void dlmalloc_exhausted_handler(void)
@@ -46,7 +58,7 @@ static void dlmalloc_exhausted_handler(void)
    Inherits CONFIG_XEDGE_STACK_SIZE from prj.conf and set in
    CMakeLists.txt
  */
-K_THREAD_STACK_DEFINE(xedge_stack, BA_STACKSZ);
+K_THREAD_STACK_DEFINE(xedge_stack, BA_THREAD_STACK_SIZE);
 struct k_thread xedge_thread_data;
 
 /**
@@ -85,7 +97,7 @@ static void xedge_error_handler(BaFatalErrorCodes ecode1,
  * Xedge disk I/O initialization (optional)
  * Return -1 to use NetIo instead of DiskIo
  */
-#ifndef NO_BAIO_DISK
+#if XEDGE_ENABLE_DISK_IO
 int xedgeInitDiskIo(DiskIo* dio)
 {
    LOG_INF("main.c - xedgeInitDiskIo: Mounting /xedge");
@@ -166,8 +178,8 @@ int main(void)
 {
     LOG_INF("Xedge application starting...");
     LOG_INF("Board: %s", CONFIG_BOARD);
-    LOG_INF("Xedge stack size: %d bytes", BA_STACKSZ);
-#ifdef USE_DLMALLOC
+    LOG_INF("Xedge stack size: %d bytes", BA_THREAD_STACK_SIZE);
+#if BA_ALLOCATOR == BA_ALLOCATOR_DLMALLOC
     // Initialize dlmalloc heap
     /* Optional external heap is NOLOAD: SDRAM is initialized after BSS. */
     static char heap_pool[CONFIG_XEDGE_HEAP_SIZE] __aligned(8)
@@ -183,6 +195,13 @@ int main(void)
     if (!device_is_ready(DEVICE_DT_GET(DT_CHILD(DT_NODELABEL(fmc), sdram))))
     {
         LOG_ERR("Cannot initialize SDRAM for the Xedge heap");
+        k_panic();
+    }
+#endif
+#if defined(CONFIG_BOARD_FRDM_RW612)
+    if (!device_is_ready(DEVICE_DT_GET(DT_NODELABEL(aps6404l))))
+    {
+        LOG_ERR("Cannot initialize PSRAM for the Xedge heap");
         k_panic();
     }
 #endif

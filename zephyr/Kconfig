@@ -50,11 +50,23 @@ config XEDGE_ENABLE_DEBUGGER
 	  This increases code size but allows remote debugging.
 
 config XEDGE_ENABLE_ENCRYPTION_KEY
-	bool "Enable TPM"
+	bool "Enable softTPM key material"
 	default y
+	depends on !XEDGE_PSA
 	help
 	  When enabled, create your own secret encryption key.
           See BAS/examples/xedge/src/EncryptionKey.h
+
+config XEDGE_PSA
+	bool "Use TF-M PSA for the TPM and TLS cryptography"
+	depends on BUILD_WITH_TFM && TFM_PARTITION_CRYPTO
+	depends on TFM_PARTITION_INTERNAL_TRUSTED_STORAGE
+	default n
+	help
+	  Use the secure firmware's PSA provider. The build automatically
+	  packages psatpm.lua as Xedge's tpm.lua.
+	  This example uses the automatically created device root for both
+	  globalkey and uniquekey; encrypted settings are device-specific.
 
 config XEDGE_ENABLE_SHARKTRUST
 	bool "Enable SharkTrustX"

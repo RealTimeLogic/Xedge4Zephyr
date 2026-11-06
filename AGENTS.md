@@ -12,6 +12,8 @@ This repository runs the Barracuda App Server (BAS) and Xedge Lua application en
 | `XedgeInit/boards/*.conf` | Per-board driver and resource settings |
 | `XedgeInit/boards/*.overlay` | Devices, RAM placement, flash partitions, and filesystem mounts |
 | `zephyr/CMakeLists.txt`, `zephyr/Kconfig` | BAS source selection and Xedge options |
+| `zephyr/Resources.cmake`, `scripts/build_resources.py` | Per-build resource generation and PSA/softTPM selection |
+| `XedgeInit/tfm/frdm_rw612/` | TF-M configuration and the board-specific filesystem security mapping |
 | `zephyr/src/flash_zip.c`, `zephyr/xedge_resources.ld` | External-flash resource ZIP support |
 | `BAS/` | Native runtime, public headers, and Zephyr port |
 | `BAS-Resources/` | Lua/web sources and `build/Xedge.sh` resource generator |
@@ -20,7 +22,7 @@ This repository runs the Barracuda App Server (BAS) and Xedge Lua application en
 
 ## Build workflow
 
-Follow the [common setup](README.md#creating-a-workspace) to install dependencies and generate `BAS/examples/xedge/XedgeZip.c`. Build on Linux or WSL2. Use `EXTRA_ZEPHYR_MODULES` to select this checkout and keep separate output directories for each target:
+Follow the [common setup](README.md#creating-a-workspace) to install dependencies. CMake generates resources automatically in each build directory. Build on Linux or WSL2. Use `EXTRA_ZEPHYR_MODULES` to select this checkout and keep separate output directories for each target:
 
 | Target | Build directory |
 | --- | --- |
@@ -28,8 +30,9 @@ Follow the [common setup](README.md#creating-a-workspace) to install dependencie
 | `mimxrt1020_evk` | `build-rt1020` |
 | `mimxrt1060_evk@C/mimxrt1062/qspi` | `build-evkc` |
 | `stm32f746g_disco` | `build-stm32f746` |
+| `frdm_rw612/rw612/ns` | `build-xedge-rw612` in the separate NXP workspace; see [board guide](doc/frdm-rw612.md) |
 
-Confirm application and module paths in `CMakeCache.txt` when multiple checkouts exist. Regenerate resources after changing their sources or options. Keep BAS and BAS-Resources revisions together so the Lua runtime and packaged resources match.
+Confirm application and module paths in `CMakeCache.txt` when multiple checkouts exist. Keep BAS and BAS-Resources revisions together so the Lua runtime and packaged resources match. The resource generator verifies the selected TPM module and adds a compile-time backend guard.
 
 ## Source conventions
 

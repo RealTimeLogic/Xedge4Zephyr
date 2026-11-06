@@ -17,15 +17,34 @@ We recommend at least **2 MiB for the Xedge heap**, with additional RAM for Zeph
 | Linux / WSL2 simulator | [Simulator setup below](#run-the-simulator) | 2 MiB | 1 MiB simulated flash |
 | NXP MIMXRT1020-EVK | [Board guide](doc/mimxrt1020-evk.md) | 70% of 32 MiB SDRAM | 4 MiB QSPI flash |
 | NXP MIMXRT1060-EVKC | [Board guide](doc/mimxrt1060-evkc.md) | 70% of 32 MiB SDRAM | 12 MiB QSPI flash |
+| NXP FRDM-RW612 with PSA / TF-M | [Board guide](doc/frdm-rw612.md) | 70% of 8 MiB PSRAM | 16 MiB QSPI flash |
 | ST STM32F746G-DISCO | [Board guide](doc/stm32f746g-disco.md) | 70% of 8 MiB SDRAM | 14 MiB QSPI flash |
 
 Complete the common setup below, then follow your target's guide. Once Xedge is running, continue with [Use Xedge](#use-xedge). To integrate another board, see [Adding a board](doc/adding-boards.md).
+
+For the NXP Freedom FRDM-RW612 board, start with its board guide: it uses a separate NXP Zephyr workspace for the PSA build described below. Hardware bring-up is pending.
+
+## Protect your device's TLS private key
+
+Xedge's **Automatic TLS Certificates** feature handles Transport Layer Security (TLS) certificate issuance and renewal while protecting the private key. With either softTPM or the PSA backend enabled, Xedge uses its [Trusted Platform Module (TPM) interface](https://realtimelogic.com/ba/doc/en/lua/auxlua.html#TPM) for certificate keys. The saved certificate state contains a key reference instead of a plaintext private key, so copying the certificate files does not expose the private key. Enable this feature through **TLS Certificate** in the IDE's three-dot menu; see [Configure HTTPS and access](#configure-https-and-access).
+
+### Default builds: softTPM
+
+The standard builds use [softTPM](https://realtimelogic.com/ba/doc/en/SoftTPM.html), which provides key protection without a dedicated security chip. It derives signing keys from firmware-provided secret material and recreates them when needed. Applications request signing and certificate operations through the TPM API, which does not expose a private-key export operation. This keeps private keys out of application files and avoids managing private-key files on the device.
+
+For a product build, replace the supplied example secret in `BAS/examples/xedge/src/EncryptionKey.h` and supply stable per-device input through `xedgeOpenAUX()`, as described in the [softTPM integration guide](https://realtimelogic.com/ba/examples/xedge/readme.html#TPM). Protect those inputs and configure release-mode debug restrictions as explained in that guide. The simulator exercises the same certificate workflow, but its test entropy is for development only.
+
+### Freedom FRDM-RW612: PSA with hardware isolation
+
+The FRDM-RW612 profile adds hardware-enforced separation between the application and its private keys. It uses the Platform Security Architecture (PSA) Crypto API through Trusted Firmware-M (TF-M). The [RW612's Arm TrustZone hardware](https://www.nxp.com/products/RW612) isolates TF-M from the Zephyr/Xedge application. TF-M manages persistent signing keys in its secure storage and performs private-key operations on the application's behalf. Xedge receives key identifiers and public information; the private signing-key bytes remain in the secure environment. See [Zephyr's TF-M key-management overview](https://docs.zephyrproject.org/latest/services/tfm/overview.html#key-management-and-derivation).
+
+The board profile enables `CONFIG_XEDGE_PSA=y`, builds TF-M alongside Xedge, and automatically selects the matching PSA Lua module. The same TPM API and **Automatic TLS Certificates** workflow use this hardware-backed protection without an external TPM chip or changes to your Lua application. Follow the [FRDM-RW612 guide](doc/frdm-rw612.md) to build and flash the combined firmware image. The current profile is a development configuration; production use requires secure-boot provisioning and debug restrictions, and hardware validation is still pending.
 
 ## Prerequisites
 
 Build on Linux or in WSL2 on Windows. Follow the [Zephyr setup guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) to install host tools, the Zephyr SDK, west, and a Python virtual environment. This guide uses Zephyr commit `935a5283f19197cd048dd93b40a87774a35ea9a4` (4.3.99), Zephyr SDK 1.0.0 with ARM GCC 14.3.0, west 1.5.0, and Python 3.12 or newer.
 
-Resource generation also needs `zip`, `curl`, and a host C compiler. Install Node.js and npm if you want to minify the JavaScript and CSS resources.
+Automatic resource generation also needs `bash`, `zip`, and a host C compiler (`cc`).
 
 Activate the virtual environment created during Zephyr setup:
 
@@ -81,25 +100,19 @@ git pull --ff-only
 git submodule update --init --recursive
 ```
 
-Regenerate the resources as described below and rebuild your target after updating. The submodule command follows this repository's recorded commits, rather than independently selecting each dependency's latest branch revision.
+Rebuild your target after updating. The submodule command follows this repository's recorded commits, rather than independently selecting each dependency's latest branch revision.
 
-### 3. Generate the embedded resources
+### 3. Embedded resources are built automatically
 
-Xedge's Lua modules and browser interface are packaged into a ZIP and converted into `XedgeZip.c`, which the firmware build compiles into the image:
+The firmware build packages the BAS-Resources submodule's Lua modules and browser interface into a ZIP, then generates `XedgeZip.c` inside that target's build directory. Source changes trigger regeneration. There is no manual copy step, and separate builds do not overwrite each other's resources.
 
-```bash
-cd ~/xedgews/modules/Xedge4Zephyr/BAS-Resources/build
-# Exclude OPC UA, use the large CA store, and skip JS/CSS minification.
-unset USE_OPCUA XedgeCaStore NO_BIN2C
-printf 'n\nl\nn\n' | bash Xedge.sh &&
-  cp XedgeZip.c ../../BAS/examples/xedge/XedgeZip.c
-```
+The build automatically matches the resources to the [selected key-protection backend](#protect-your-devices-tls-private-key). `CONFIG_XEDGE_PSA=y`, enabled by the FRDM-RW612 profile, packages `src/mako/.lua/psatpm.lua` as Xedge's `tpm.lua`. Other builds package the default softTPM module. The generator verifies the selected module and adds a compile-time check against a backend mismatch. This example excludes OPC UA and skips JavaScript/CSS minification.
 
-The certificate authority (CA) store supplies trusted roots for outgoing Transport Layer Security (TLS) connections. To choose other resource options, run `bash Xedge.sh` interactively and copy the resulting `XedgeZip.c` to the same location. Regenerate it after changing BAS-Resources or its packaging options; edit the resource sources rather than the generated C file.
+The module always compiles BAS and Xedge with `BA_ENABLE_EMBEDDED_CA=1`. The certificate authority (CA) roots for outgoing Transport Layer Security (TLS) connections come from `BAS/inc/cacert.h`; the resource ZIP omits `cacert.shark`. Updating the compiled CA roots requires a firmware rebuild. Edit the resource sources rather than the generated C file.
 
 ### 4. Build your target
 
-For hardware, continue with the [RT1020](doc/mimxrt1020-evk.md#build), [RT1060](doc/mimxrt1060-evkc.md#build), or [STM32](doc/stm32f746g-disco.md#build) instructions. For the simulator:
+For hardware, continue with the [RT1020](doc/mimxrt1020-evk.md#build), [RT1060](doc/mimxrt1060-evkc.md#build), or [STM32](doc/stm32f746g-disco.md#build) instructions. For the PSA build, use the [FRDM-RW612 guide and its separate NXP workspace](doc/frdm-rw612.md#build). For the simulator:
 
 ```bash
 cd ~/xedgews
@@ -200,7 +213,11 @@ Use `.preload` for application initialization and `.xlua` files for Lua programs
 
 ### Configure HTTPS and access
 
-HTTPS listens on port 443. The initial demonstration certificate causes a browser trust warning. Open the IDE over HTTP for initial setup. For automatic certificates, open the three-dot menu and select **TLS Certificate**, supply an email address and device name, and save. Leave **Let's Encrypt Staging** off to obtain a browser-trusted certificate; staging certificates are for development. The device needs working DNS, Internet access, and a synchronized clock. Open the assigned HTTPS hostname after issuance completes.
+HTTPS listens on port 443. The initial demonstration certificate causes a browser trust warning. Open the IDE over HTTP for initial setup.
+
+To enable **Automatic TLS Certificates**, open the three-dot menu and select **TLS Certificate**, supply an email address and device name, and save. Leave **Let's Encrypt Staging** off to obtain a browser-trusted certificate; staging certificates are for development. The device needs working DNS, Internet access, and a synchronized clock. Open the assigned HTTPS hostname after issuance completes. Xedge then handles certificate renewal automatically.
+
+With either the default softTPM or the FRDM-RW612 PSA backend, the certificate's private key is protected through the [TPM interface](#protect-your-devices-tls-private-key). You do not need to generate, upload, or store a plaintext private-key file to use automatic certificates.
 
 Use **Authentication** in the same menu to configure IDE users. Follow the [Xedge configuration guide](https://realtimelogic.com/ba/doc/en/Xedge.html#conf) for certificate and authentication options, including the keys and service configuration needed for product deployment.
 
@@ -227,7 +244,8 @@ Search for `XEDGE` with `/`. Save permanent settings in `XedgeInit/prj.conf` for
 | `CONFIG_XEDGE_THREAD_PRIORITY` | Integer; 5, range 2 to 15 | Server priority; smaller numbers mean higher priority |
 | `CONFIG_XEDGE_ENABLE_DISK_IO` | Boolean; `y` with filesystem support | Store applications and settings in `/xedge` |
 | `CONFIG_XEDGE_ENABLE_DEBUGGER` | Boolean; `y` | Lua debugger support |
-| `CONFIG_XEDGE_ENABLE_ENCRYPTION_KEY` | Boolean; `y` | Configuration encryption support; configure your product key in `BAS/examples/xedge/src/EncryptionKey.h` |
+| `CONFIG_XEDGE_ENABLE_ENCRYPTION_KEY` | Boolean; `y` without PSA | softTPM key material; configure your product key in `BAS/examples/xedge/src/EncryptionKey.h` |
+| `CONFIG_XEDGE_PSA` | Boolean; `n`, enabled by the FRDM-RW612 profile | Use TF-M secure key storage and cryptography for the TPM and TLS; automatically package the PSA Lua module |
 | `CONFIG_XEDGE_ENABLE_SHARKTRUST` | Boolean; `y` | SharkTrustX certificate service integration; configure the service token in `BAS/examples/xedge/src/tokengen.c` |
 
 Xedge's heap is separate from Zephyr's heap, network pools, and static thread stacks. Keep the DNS socket-service thread at a higher priority than BAS threads; the shared configuration uses priorities 2 and 5 respectively. See [Adding a board](doc/adding-boards.md) for memory placement and storage configuration.
