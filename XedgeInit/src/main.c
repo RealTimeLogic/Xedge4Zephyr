@@ -19,6 +19,7 @@
 #include <HttpServer.h>
 #include <BaErrorCodes.h>
 #include <xedge.h>
+#include "mdns.h"
 
 // From Xedge (xedge.c) - the main server loop.
 extern void barracuda(void);
@@ -117,7 +118,7 @@ int xedgeInitDiskIo(DiskIo* dio)
 */
 int xedgeOpenAUX(XedgeOpenAUX* aux)
 {
-   ARG_UNUSED(aux);
+   xedgeMdnsInit(aux->L);
    k_sem_give(&xedge_ready);
    return 0; /* OK */
 }
@@ -209,18 +210,30 @@ int main(void)
     dlmalloc_setExhaustedCB(dlmalloc_exhausted_handler);
     LOG_INF("Xedge - dlmalloc initialized - heap size: %d bytes", sizeof(heap_pool));
 #endif
-    /* Seed SharkSSL before any TLS or key-generation work starts. */
+    /* Initialize cryptography before TLS or key-generation work starts. */
+#if defined(CONFIG_XEDGE_PSA)
+    if (sharkssl_entropy() != 0)
+    {
+        LOG_ERR("Cannot initialize PSA cryptography");
+        k_panic();
+    }
+#else
     const struct device *entropy = DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
-    uint32_t seed[8];
+    uint8_t seed[48];
     if (!device_is_ready(entropy) ||
         entropy_get_entropy(entropy, (uint8_t *)seed, sizeof(seed)) != 0)
     {
         LOG_ERR("Cannot obtain startup entropy");
         k_panic();
     }
-    for (size_t i = 0; i < ARRAY_SIZE(seed); ++i)
-        sharkssl_entropy(seed[i]);
+    int seeded = sharkssl_entropyEx(seed, sizeof(seed));
     memset(seed, 0, sizeof(seed));
+    if (seeded != 0)
+    {
+        LOG_ERR("Cannot seed SharkSSL");
+        k_panic();
+    }
+#endif
 
     // Set up error handler and trace callback
     HttpServer_setErrHnd(xedge_error_handler);

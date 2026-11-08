@@ -1,14 +1,14 @@
-# Xedge with PSA on the FRDM-RW612
+# Xedge on the FRDM-RW612
 
-Build browser-managed applications on the NXP Freedom FRDM-RW612 with hardware-backed protection for HTTPS private keys. Enable **Automatic TLS Certificates** to use that protection with automatic certificate issuance and renewal. See the README's [private-key protection overview](../README.md#protect-your-devices-tls-private-key) for the softTPM and PSA security models and certificate setup.
+Build your device's web interface on the NXP Freedom FRDM-RW612 while keeping HTTPS signing keys in a separate secure environment. Xedge combines browser-based Lua development with **Automatic TLS Certificates**, so you can develop applications and manage certificate issuance and renewal from the IDE. See the [TPM overview](../README.md#tpm) for the softTPM and PSA security models.
 
-This example runs Xedge over the board's Ethernet connection, uses external PSRAM for the Lua heap, and calls the Platform Security Architecture (PSA) Crypto API through Trusted Firmware-M (TF-M). TF-M runs separately from the nonsecure Zephyr application and owns the persistent signing keys. No external security chip or custom cryptography provider is required.
+This profile uses Ethernet, 8 MiB of external PSRAM, and the Platform Security Architecture (PSA) Crypto API through Trusted Firmware-M (TF-M). The RW612's Arm TrustZone hardware separates TF-M from the nonsecure Zephyr application. TF-M owns the persistent signing keys and performs private-key operations on Xedge's behalf, without an external security chip.
 
-This is a development configuration. Hardware bring-up, key persistence across power cycles, and concurrent filesystem/TLS operation must be verified when the board is available. The example retains NXP's development boot keys; production boot provisioning and debug restrictions are separate requirements. It does not establish FIPS validation.
+The profile uses NXP's development boot keys. Provision production boot keys and apply the required debug restrictions before deployment.
 
 ## Prepare the workspace
 
-Use Linux or WSL2 with the tools in the [common prerequisites](../README.md#prerequisites). Use a separate workspace for [NXP ZSDK nxp-v4.4.1.1](https://github.com/nxp-zephyr/nxp-zsdk/releases/tag/nxp-v4.4.1.1), which includes the RW612 TF-M/PSRAM fixes:
+Use Linux or WSL2 with the tools in the [common prerequisites](../README.md#prerequisites). Create a separate workspace with [NXP ZSDK nxp-v4.4.1.1](https://github.com/nxp-zephyr/nxp-zsdk/releases/tag/nxp-v4.4.1.1) for this board's TF-M and PSRAM configuration:
 
 ```bash
 source ~/zephyrproject/.venv/bin/activate
@@ -45,13 +45,17 @@ west build -d build-xedge-rw612 -b frdm_rw612/rw612/ns \
   "$XEDGE_DIR/XedgeInit" -- -DEXTRA_ZEPHYR_MODULES="$XEDGE_DIR"
 ```
 
-The build generates the PSA resources automatically, builds TF-M and Xedge, and produces `build-xedge-rw612/zephyr/tfm_merged.hex`. Use this combined image for initial programming. `zephyr.hex` alone does not contain the secure firmware and bootloader.
+The same `west build` command packages the matching PSA Lua resources, builds TF-M and Xedge, and produces `build-xedge-rw612/zephyr/tfm_merged.hex`. Use this combined image for initial programming. `zephyr.hex` alone does not contain the secure firmware and bootloader.
+
+SharkSSL remains the TLS implementation and calls the TF-M PSA provider for cryptography. The build sets `CONFIG_XEDGE_PSA=y` and disables softTPM key material. Lua applications use `ba.tpm` for named keys, signing, and certificates; the Boolean `ba.psa` is `true` in this build. Use the [TPM API documentation](https://realtimelogic.com/ba/doc/en/lua/auxlua.html#TPM) for application development. Legacy private-key APIs such as `ba.create.key` are unavailable in PSA mode, including the bundled OPC UA certificate-creation workflow.
 
 The [board configuration](../XedgeInit/boards/frdm_rw612_rw612_ns.conf) selects Ethernet, DHCP, PSA, assertions, and the PSRAM initialization order. The [overlay](../XedgeInit/boards/frdm_rw612_rw612_ns.overlay) sets PSRAM pins, heap placement, and the filesystem. Wi-Fi is not enabled in this example.
 
-## Connect the board
+Keep `CONFIG_ARM_NONSECURE_PREEMPTIBLE_SECURE_CALLS=n` for this target. Zephyr's TF-M dispatcher temporarily gives the calling thread cooperative priority so it cannot be switched out during a secure PSA operation. It restores the original priority when the call returns. Interrupts remain enabled; thread scheduling resumes between calls.
 
-1. Connect the MCU-Link USB port to the programming host and Ethernet to a LAN with DHCP and DNS. Internet access provides clock synchronization and online certificate services.
+## Flash and connect
+
+1. Leave **JP3 open**, connect the **J10 MCU-Link USB port** to the programming host, and connect Ethernet to a LAN with DHCP and DNS. Internet access provides clock synchronization and online certificate services.
 2. Open the serial console at **115200 baud, 8 data bits, no parity, one stop bit**.
 3. Install NXP LinkServer and make the debug probe available to the host running `west`. Follow the [NXP Zephyr board instructions](https://github.com/nxp-zephyr/nxp-zephyr/blob/e5a841432a6262089eabb237e6f0f2eb87f81091/boards/nxp/frdm_rw612/doc/index.rst) for the probe and boot settings.
 4. Program the combined image:
@@ -61,30 +65,53 @@ The [board configuration](../XedgeInit/boards/frdm_rw612_rw612_ns.conf) selects 
 west flash -d build-xedge-rw612 --runner linkserver
 ```
 
-Find the DHCP address in the console and open `http://<board-ip>/rtl/`. Continue with [Use Xedge](../README.md#use-xedge). HTTPS initially uses a self-signed certificate created through the PSA TPM.
+If MCU-Link runs SEGGER J-Link firmware, use J-Link Commander instead. Select device `RW612`, SWD, and 4000 kHz. Issue these commands in the connected Commander session, replacing the image path with your combined image:
 
-Ordinary firmware updates must preserve TF-M's persistent storage and Xedge's filesystem. Do not use a whole-chip erase when testing persistence.
+```text
+r0
+sleep 200
+r1
+connect
+h
+loadfile /absolute/path/to/build-xedge-rw612/zephyr/tfm_merged.hex
+r0
+sleep 200
+r1
+```
 
-## Memory and keys
+Wait for `loadfile` to finish programming and verifying before the final reset. The reset-pin sequence starts the complete secure boot chain; a core reset from the running nonsecure application is insufficient. Reopen the serial console if connecting the debugger interrupts its USB serial handle.
+
+Find the DHCP address in the console and open `http://<board-ip>/rtl/`. Continue with [Running Lua Applications](../README.md#running-lua-applications). HTTPS initially uses a self-signed certificate created through the PSA TPM.
+
+Native mDNS supports SharkCA's local HTTPS names. Start with the [automatic certificate management introduction](https://realtimelogic.com/services/SharkTrust/), then follow the [Xedge certificate manual](https://realtimelogic.com/ba/doc/en/Xedge.html#cert). [Local names and SharkCA](mdns.md) covers Zephyr-specific behavior. The PSA backend supplies the certificate's private-key operations.
+
+For firmware updates, follow [Preserve keys and settings](#preserve-keys-and-settings) to retain the device's identity and encrypted configuration.
+
+## Memory and storage
 
 | Region | Address / flash offset | Capacity | Purpose |
 | --- | --- | ---: | --- |
 | Nonsecure firmware | Flash offset `0x000c0000` | 3 MiB | Xedge, Zephyr, embedded resources |
-| Internal nonsecure SRAM | `0x20040000` | 960 KiB | Zephyr static data, networking, stacks |
+| Internal nonsecure SRAM | `0x20040000` | 960 KiB | Zephyr static data, networking, all thread stacks; includes a 256 KiB kernel heap |
 | External PSRAM | `0x0c000000` | 8 MiB | 5,872,024-byte Xedge heap, placed in a NOLOAD section |
 | Xedge filesystem | Flash offset `0x01000000` | 16 MiB | LittleFS mounted at `/xedge` |
 
 The filesystem occupies flash offsets 16-32 MiB. The [secure mapping hook](../XedgeInit/tfm/frdm_rw612/storage.c) grants nonsecure access to only that additional region, using NXP's flash security helper and Security Attribution Unit (SAU) region 6. It leaves the bootloader, update slots, radio firmware, and TF-M key storage in their existing regions. The layout is shared with the overlay through [frdm_rw612_memory.h](../XedgeInit/boards/frdm_rw612_memory.h). EdgeLock 2GO would require another SAU layout.
 
+Flash and PSRAM share the FlexSPI controller. This board allocates BAS thread stacks and their startup semaphores from Zephyr's internal kernel heap, so flash operations can reset the controller safely. Lua and application allocations retain the 70% PSRAM heap. The [secure flash integration](../XedgeInit/tfm/frdm_rw612/flash.c) preserves the controller's flash/PSRAM command table across TF-M ROM storage operations. Keep both settings when changing the memory layout.
+
 `xedgeInitPsa()` initializes the PSA client before Xedge uses cryptography. The existing generic BAS bindings create a persistent device root on first use. This example sets `BA_PSA_GLOBALKEY_USE_DEVICE_ROOT=1`, so both `globalkey()` and `uniquekey()` use that root. Xedge still encrypts `xcfg.bin` through `globalkey()`, but the resulting configuration is device-specific. A missing root is recreated; data encrypted under the previous root cannot be recovered from its name.
 
-Named signing keys use the default PSA key location in TF-M. The Lua application receives key identifiers and public information, rather than private signing-key bytes. Secret derivation uses HKDF-SHA-512. NXP's provider supplies the cryptographic operations; `lpsa.c` has no RW612-specific changes. ChaCha20/Poly1305 and Brainpool curves are disabled to match the selected provider configuration.
+Named signing keys use the default PSA key location in TF-M. Lua applications receive key identifiers and public information; the private signing-key bytes stay in the secure environment. Secret derivation uses HKDF-SHA-512. The TF-M configuration enables HKDF Extract and Expand for TLS 1.3 and PBKDF2-HMAC for SharkCA registration proofs. ChaCha20/Poly1305 and Brainpool curves are disabled to match NXP's provider configuration.
 
-## First hardware checks
+## Size the cryptographic resources
 
-- Confirm PSRAM initialization, LittleFS mounting, DHCP, time synchronization, and the browser IDE.
-- Confirm `ba.psa == true`, create a named signing key, and exercise signing, certificate creation, and HTTPS.
-- Save an application and encrypted configuration, power-cycle the board, and verify the files, certificate identity, and named key remain usable.
-- Exercise simultaneous HTTPS connections while saving files. Check for PSA slot exhaustion, stack faults, and flash/PSRAM interference.
+`CONFIG_XEDGE_HTTP_CONNECTIONS` defaults to 16 connection slots shared by HTTP and HTTPS, independently of the server's worker-thread count. The [TF-M configuration](../XedgeInit/tfm/frdm_rw612/config.h) allows 64 simultaneous cryptographic operations and 64 loaded key slots. These are separate limits: TLS connections retain hash operations and volatile keys, while NXP's default persistent store allows 10 assets. Size these limits for the required named keys and simultaneous connections. When increasing `CONFIG_XEDGE_MAX_THREADS` or `CONFIG_XEDGE_STACK_SIZE`, also allow enough internal kernel heap for the additional stacks. See [Configuring Xedge for Zephyr](../README.md#configuring-xedge-for-zephyr) for the shared network limits.
 
-The [TF-M configuration](../XedgeInit/tfm/frdm_rw612/config.h) allows 64 simultaneous cryptographic operations and 64 loaded key slots. These are separate limits: TLS connections retain hash operations and volatile keys, while NXP's default persistent store allows 10 assets. Size these limits for the required named keys and simultaneous connections after measuring the hardware workload; a successful link does not verify those limits.
+## Preserve keys and settings
+
+Keep TF-M's persistent storage and the `/xedge` filesystem across firmware updates. TF-M stores the device root and named signing keys; Xedge stores encrypted settings, certificates, certificate-management state, and application files. Use the combined image with a programmer that erases only the sectors being written. Do not use a whole-chip erase when retaining device identities and settings, and keep the storage layout compatible when changing firmware.
+
+The PSA profile derives both `globalkey()` and `uniquekey()` from the device root. Despite its name, `globalkey()` does not provide a shared fleet key in this configuration. Copying `xcfg.bin` to another device does not transfer the root needed to decrypt it. If the root is lost, creating a replacement cannot recover previously encrypted data. Losing a signing key requires a replacement key and certificate enrollment.
+
+Before switching between softTPM and PSA or changing the key-derivation configuration, recover any required data while its original keys are available and plan its migration, or deliberately reset it. The shared Lua API does not make stored keys and encrypted data interchangeable. There is no automatic migration or fallback to softTPM. See the [BAS PSA integration guide](https://realtimelogic.com/ba/doc/en/C/reference/html/PSAIntegration.html) for provisioning and persistence details.

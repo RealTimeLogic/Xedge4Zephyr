@@ -96,6 +96,17 @@ config XEDGE_MAX_THREADS
 	help
 	  Maximum number of concurrent threads for the server.
 
+config XEDGE_HTTP_CONNECTIONS
+	int "HTTP and HTTPS connection capacity"
+	default 16
+	range 4 65535
+	help
+	  Number of BAS connection slots shared by HTTP and HTTPS, including
+	  idle persistent connections. BAS raises this to at least its HTTP
+	  command count plus three. This does not add worker threads.
+	  Active connections also need TLS memory and Zephyr network resources.
+	  Reserve network capacity for listeners, DNS and outbound clients.
+
 config XEDGE_RESOURCE_FLASH
 	bool "Read the embedded Xedge resource ZIP through the flash driver"
 	default n

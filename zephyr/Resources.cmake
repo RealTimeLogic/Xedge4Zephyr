@@ -7,7 +7,8 @@ endif()
 set(XEDGE_RESOURCE_FILE "${CMAKE_CURRENT_BINARY_DIR}/resources/${xedge_psa}/XedgeZip.c")
 file(GLOB_RECURSE xedge_resource_inputs CONFIGURE_DEPENDS
   "${xedge_source}/BAS-Resources/src/core/*"
-  "${xedge_source}/BAS-Resources/src/xedge/*")
+  "${xedge_source}/BAS-Resources/src/xedge/*"
+  "${xedge_source}/BAS-Resources/src/opcua/*")
 if(CONFIG_XEDGE_PSA)
   list(APPEND xedge_resource_inputs "${xedge_source}/BAS-Resources/src/mako/.lua/psatpm.lua")
 endif()

@@ -1,6 +1,6 @@
 # Xedge on the MIMXRT1060-EVKC
 
-Use the NXP MIMXRT1060-EVKC to run Xedge applications over wired Ethernet. This configuration reserves 70% of the board's 32 MiB SDRAM for Xedge and provides 12 MiB of flash for applications and settings.
+Build web interfaces and connected services on the NXP MIMXRT1060-EVKC, then update your Lua applications through Xedge's browser IDE. This Ethernet profile reserves 70% of the board's 32 MiB SDRAM for Xedge and provides 12 MiB of flash for applications and settings.
 
 ## Build
 
@@ -15,7 +15,7 @@ west build -d build-evkc -b mimxrt1060_evk@C/mimxrt1062/qspi \
   -DEXTRA_ZEPHYR_MODULES="$PWD/modules/Xedge4Zephyr"
 ```
 
-Zephyr loads [the board configuration](../XedgeInit/boards/mimxrt1060_evk_mimxrt1062_qspi.conf) and [overlay](../XedgeInit/boards/mimxrt1060_evk_mimxrt1062_qspi.overlay). The overlay requires revision C's 16 MiB QSPI flash. Use a separate configuration for earlier board revisions with different flash devices.
+Zephyr loads [the board configuration](../XedgeInit/boards/mimxrt1060_evk_mimxrt1062_qspi.conf) and [overlay](../XedgeInit/boards/mimxrt1060_evk_mimxrt1062_qspi.overlay). The overlay requires revision C's 16 MiB QSPI flash. Board revisions with different flash devices need their own configuration.
 
 The firmware boots directly from QSPI flash, including the NXP boot header and SDRAM initialization data. The build outputs are in `build-evkc/zephyr/`, including `zephyr.elf`, `zephyr.bin`, and `zephyr.map`. Rebuild after source changes with `west build -d build-evkc`.
 
@@ -31,7 +31,9 @@ The firmware boots directly from QSPI flash, including the NXP boot header and S
 west flash -d build-evkc --runner linkserver
 ```
 
-Reset the board after programming. Find its DHCP address in the serial output, then open `http://<board-ip>/rtl/`. Continue with [Use Xedge](../README.md#use-xedge) to create an application and configure HTTPS.
+Reset the board after programming. Find its DHCP address in the serial output, then open `http://<board-ip>/rtl/`. Continue with [Running Lua Applications](../README.md#running-lua-applications) to create an application and configure HTTPS.
+
+Native mDNS supports SharkCA's local HTTPS names. Start with the [automatic certificate management introduction](https://realtimelogic.com/services/SharkTrust/), then follow the [Xedge certificate manual](https://realtimelogic.com/ba/doc/en/Xedge.html#cert). [Local names and SharkCA](mdns.md) covers Zephyr-specific behavior.
 
 The image uses the first 4 MiB of QSPI flash. LittleFS mounts the remaining 12 MiB at `/xedge` and formats it on first use. Program only the firmware partition during updates to preserve saved applications; avoid a whole-chip erase. The layout boots directly without MCUboot or an update slot.
 
@@ -45,13 +47,9 @@ The image uses the first 4 MiB of QSPI flash. LittleFS mounts the remaining 12 M
 | Instruction tightly coupled memory (ITCM) | `0x00000000` | 128 KiB | Flash driver code |
 | Data tightly coupled memory (DTCM) | `0x20000000` | 128 KiB | Ethernet DMA buffers and descriptors, other DTCM data |
 
-`CONFIG_XEDGE_HEAP_SIZE=23488096` reserves 70% of SDRAM, rounded down to an 8-byte boundary:
+`CONFIG_XEDGE_HEAP_SIZE=23488096` reserves 70% of SDRAM, rounded down to an 8-byte boundary. See [Heap sizing](adding-boards.md#3-place-and-size-the-xedge-heap) when changing this allocation.
 
-```text
-floor((32 * 1024 * 1024 * 70 / 100) / 8) * 8 = 23,488,096 bytes
-```
-
-BAS worker stacks come from this heap. Zephyr's heap, static stacks, and network pools use additional RAM. This setting applies only to the EVKC; the simulator keeps its 2 MiB heap.
+BAS worker stacks come from this heap. Budget separately for Zephyr's heap, static stacks, and network pools.
 
 Code and embedded resources are read directly from QSPI flash. Flash-writing code and the controller's constant configuration use ITCM so the filesystem can use the same flash device as the firmware. Keep the relocation in [CMakeLists.txt](../XedgeInit/CMakeLists.txt), the flash-driver relocation settings, and disabled flash/controller logging when modifying this layout.
 

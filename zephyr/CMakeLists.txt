@@ -21,7 +21,8 @@ zephyr_include_directories(
 # For Zephyr, we use the generic SoDisp with Zephyr sockets
 set(XEDGE_NET_ARCH "generic")
 
-# Core BAS library (amalgamated)
+# Core BAS library (amalgamated). Keep the portable crypto defaults, including
+# native_sim; RW612 delegates crypto to PSA. No optional ASM objects are linked.
 zephyr_library_sources(
   ${CMAKE_CURRENT_LIST_DIR}/../BAS/src/BAS.c
 )
@@ -31,6 +32,16 @@ zephyr_library_sources(
   ${CMAKE_CURRENT_LIST_DIR}/../BAS/src/arch/Zephyr/ThreadLib.c
   ${CMAKE_CURRENT_LIST_DIR}/../BAS/src/arch/NET/${XEDGE_NET_ARCH}/SoDisp.c
 )
+
+if(CONFIG_BOARD_FRDM_RW612)
+  # Flash and PSRAM share FlexSPI. Its reset temporarily prevents PSRAM
+  # access, so the flash caller's stack must stay in internal SRAM.
+  # ThreadLib.c allocates only thread stacks and their startup semaphores;
+  # use the kernel heap for those allocations and both release paths.
+  set_property(SOURCE ${CMAKE_CURRENT_LIST_DIR}/../BAS/src/arch/Zephyr/ThreadLib.c
+    TARGET_DIRECTORY zephyr APPEND PROPERTY COMPILE_DEFINITIONS
+    dlmalloc=k_malloc dlfree=k_free)
+endif()
 
 # Memory management - dlmalloc for RTOS
 zephyr_library_sources(
@@ -65,8 +76,14 @@ zephyr_compile_definitions(
   BA_ZEPHYR=1
   BA_ALLOCATOR=BA_ALLOCATOR_DLMALLOC
   BA_ENABLE_EMBEDDED_CA=1
+  # Match the OPC UA Lua resources and register the native address-space reader.
+  BA_ENABLE_LUA_OPCUA=1
+  # ba.createmdns uses Zephyr's responder through XedgeInit/src/mdns.c.
+  BA_ENABLE_MDNS=0
+  BA_ENABLE_MDNS_LUA=0
   XEDGE_THREAD_POOL_MODE=XEDGE_THREAD_POOL_SHARED_FIXED
   XEDGE_THREAD_COUNT=${CONFIG_XEDGE_MAX_THREADS}
+  XEDGE_HTTP_CONNECTIONS=${CONFIG_XEDGE_HTTP_CONNECTIONS}
   BA_THREAD_STACK_SIZE=${CONFIG_XEDGE_STACK_SIZE}
 )
 

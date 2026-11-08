@@ -6,7 +6,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(XedgeInit)
 
 # Application source files
-target_sources(app PRIVATE src/main.c)
+target_sources(app PRIVATE src/main.c src/mdns.c)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../zephyr/Dns.cmake)
 
 if(CONFIG_BOARD_FRDM_RW612 AND CONFIG_XEDGE_PSA)
   set_property(TARGET zephyr_property_target APPEND PROPERTY TFM_CMAKE_OPTIONS

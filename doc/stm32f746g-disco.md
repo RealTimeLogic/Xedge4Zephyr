@@ -1,6 +1,6 @@
 # Xedge on the STM32F746G-DISCO
 
-Use the STM32F746G Discovery board, also called 32F746GDISCOVERY, to run Xedge applications over wired Ethernet. This configuration reserves 70% of its 8 MiB accessible SDRAM for Xedge. Its 16 MiB Quad-SPI (QSPI) flash stores Xedge's embedded resources and application files. The browser provides the interface, so the LCD and touch controller are disabled.
+Give the STM32F746G Discovery board a web interface you can develop and update from your browser. This Ethernet profile reserves 70% of the board's 8 MiB accessible SDRAM for Xedge and uses its 16 MiB Quad-SPI (QSPI) flash for embedded resources and application files. The board is also sold as 32F746GDISCOVERY. Its LCD and touch controller are disabled in this profile.
 
 ## Build
 
@@ -49,7 +49,9 @@ $programmer = 'C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer
   -d .\zephyr.hex -v -hardRst
 ```
 
-Find the board's DHCP address in the serial output and open `http://<board-ip>/rtl/`. Continue with [Use Xedge](../README.md#use-xedge) to create an application and configure HTTPS. The board's display remains unused.
+Find the board's DHCP address in the serial output and open `http://<board-ip>/rtl/`. Continue with [Running Lua Applications](../README.md#running-lua-applications) to create an application and configure HTTPS. The board's display remains unused.
+
+Native mDNS supports SharkCA's local HTTPS names. Start with the [automatic certificate management introduction](https://realtimelogic.com/services/SharkTrust/), then follow the [Xedge certificate manual](https://realtimelogic.com/ba/doc/en/Xedge.html#cert). [Local names and SharkCA](mdns.md) covers Zephyr-specific behavior.
 
 ## Memory and storage
 
@@ -62,13 +64,9 @@ Find the board's DHCP address in the serial output and open `http://<board-ip>/r
 | QSPI resource partition | `0x90000000` | 2 MiB | Embedded Xedge Lua and web resource ZIP |
 | QSPI LittleFS partition | `0x90200000` | 14 MiB | Writable Xedge applications and configuration |
 
-`CONFIG_XEDGE_HEAP_SIZE=5872024` reserves 70% of SDRAM, rounded down to an 8-byte boundary:
+`CONFIG_XEDGE_HEAP_SIZE=5872024` reserves 70% of SDRAM, rounded down to an 8-byte boundary. See [Heap sizing](adding-boards.md#3-place-and-size-the-xedge-heap) when changing this allocation.
 
-```text
-floor((8 * 1024 * 1024 * 70 / 100) / 8) * 8 = 5,872,024 bytes
-```
-
-The overlay's `xedge,heap` entry places the heap in SDRAM. Its `NOLOAD` section prevents startup from clearing external RAM before the memory controller is ready. The application checks the SDRAM controller before initializing the allocator. This heap setting applies only to the STM32 board.
+The overlay's `xedge,heap` entry places the heap in SDRAM. Its `NOLOAD` section prevents startup from clearing external RAM before the memory controller is ready. The application checks the SDRAM controller before initializing the allocator.
 
 `CONFIG_XEDGE_RESOURCE_FLASH=y` stores the resource ZIP in QSPI. At runtime, resources are read through the flash driver, which serializes these reads with LittleFS writes. All executable code remains in internal flash. Programming internal flash alone is insufficient because Xedge also needs the resource ZIP.
 

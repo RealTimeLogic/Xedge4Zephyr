@@ -24,7 +24,7 @@ def build(source, output, psa):
     bin2c = tools / 'bin2c'
     subprocess.run(['cc', str(source / 'BAS/tools/bin2c.c'), '-o', str(bin2c)], check=True)
     env = dict(os.environ, SHARKSSL_PSA_CONSUMER=str(psa),
-               BA_ENABLE_LUA_OPCUA='0', NO_BIN2C='1')
+               BA_ENABLE_LUA_OPCUA='1', NO_BIN2C='1')
     subprocess.run(['bash', 'Xedge.sh'], cwd=work, env=env,
                    input='n\n', text=True, check=True)
     archive = output.with_suffix('.zip')
