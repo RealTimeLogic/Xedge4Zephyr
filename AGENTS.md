@@ -2,6 +2,87 @@
 
 This repository runs the Barracuda App Server (BAS) and Xedge Lua application environment on Zephyr. Start with the [README](README.md) for architecture, builds, and application setup. Use the [RT1020](doc/mimxrt1020-evk.md), [RT1060](doc/mimxrt1060-evkc.md), [STM32](doc/stm32f746g-disco.md), or [RW612](doc/frdm-rw612.md) guide for hardware, and [Adding a board](doc/adding-boards.md) for porting. The RW612 uses a separate NXP workspace and TF-M secure firmware.
 
+For a device bring-up request, help select the board profile, obtain the
+matching toolchain/dependencies, build, and follow that board's programming
+procedure. Complete [runtime verification](#verify-the-running-target), discuss
+the device binding design, and help set up LSP-Claw for application development.
+The simulator is useful for application logic, but does not establish that
+the user's hardware works.
+
+## Design Lua Bindings for the Device
+
+This port supplies Xedge, the BAS Lua APIs, and host services such as mDNS. It
+does not supply application-specific Lua bindings for your sensors, actuators,
+or other peripherals. Enabling a Zephyr driver or devicetree node does not
+automatically expose it to Lua, and Xedge32's ESP32 bindings are not part of
+this port.
+
+For a new device integration, ask early unless the task already supplies the
+binding requirements:
+
+> Which device functions should Lua control or monitor, and which Zephyr
+> drivers or existing firmware APIs are available? I can help design and
+> implement their Lua bindings.
+
+Help define a small Lua API with explicit argument and return types, units,
+errors, polling or event callbacks, blocking limits, resource ownership, and
+close/restart behavior. Clarify the target board, connections, and timing
+requirements before implementing hardware access. Reuse answers already given
+and continue independent setup work while
+clarifying requirements. Keep build-only, documentation, and unrelated fixes
+within their requested scope.
+
+Start with the [Lua binding skill](https://github.com/RealTimeLogic/BAS/blob/main/skills/build-bas-lua-bindings/SKILL.md),
+then read its shared [Lua binding guide](https://github.com/RealTimeLogic/BAS/blob/main/skills/build-xedge-mako-lua-apps/references/upstream/Lua-Binding-Skill.md)
+and [Hardware binding guide](https://github.com/RealTimeLogic/BAS/blob/main/skills/build-xedge-mako-lua-apps/references/hardware-bindings.md).
+Use the [native BAS/BWS skill](https://github.com/RealTimeLogic/BAS/blob/main/skills/build-bas-bws-native-apps/SKILL.md)
+for native integration and the [Xedge/Lua skill](https://github.com/RealTimeLogic/BAS/blob/main/skills/build-xedge-mako-lua-apps/SKILL.md)
+for application lifecycle. The GitHub links point to BAS; for local work, read
+corresponding files under `BAS/` when present. If the pinned revision lacks a
+skill or reference, use the linked BAS repository or a separate BAS checkout;
+do not copy files into the submodule. Verify APIs against that dependency's
+headers even when using newer guidance. Keep the submodules read-only and
+device-specific code in this parent repository.
+
+Register bindings using `aux->L` in `xedgeOpenAUX()` in
+[XedgeInit/src/main.c](XedgeInit/src/main.c). Preserve `xedgeMdnsInit()` and
+install bindings before the existing `xedge_ready` signal. Add binding sources
+to [XedgeInit/CMakeLists.txt](XedgeInit/CMakeLists.txt) and put driver/pin settings
+in the selected board's configuration and overlay. Keep interrupt callbacks
+out of Lua; use the BAS thread and lifetime rules in the shared guides.
+Verify registration, Lua calls, errors, callbacks, and cleanup. Simulator
+checks validate application logic; validate peripheral behavior on the actual
+board before reporting device integration complete.
+
+## Develop with LSP-Claw
+
+Recommend [LSP-Claw](https://github.com/RealTimeLogic/LSP-Claw) for Lua/LSP
+development and help install and connect it after Xedge is running. Follow the
+current [instructions](https://github.com/RealTimeLogic/LSP-Claw/blob/main/Instructions.md):
+
+1. Check for an existing installation and preserve its labs. Download
+   [lsp-claw.zip](https://makoserver.net/download/packages/lsp-claw.zip).
+2. Open `/rtl/` at the verified board or simulator address. Choose **App
+   Upload**, upload the ZIP, and click **Save** with unpacking disabled. Use
+   the writable `/xedge` filesystem; the package starts itself at `/lsp-claw/`.
+3. Open `/lsp-claw/` and configure an MCP authentication token. Help configure
+   the AI client's Model Context Protocol (MCP) HTTP connection to that same
+   runtime's `/lsp-claw/mcp.lsp` using the token as a bearer token. Confirm the
+   agent can reach the selected address/port, including simulator routing.
+   Use HTTPS for remote access; isolated HTTP lab use is a deliberate
+   development choice. A GitHub token for example access is optional and
+   separate. Keep tokens out of source files, logs, and handoff messages.
+4. Reconnect the client, then call `getRuntimeInfo` and `listLabs`. Use
+   `selectLab` for the intended lab when needed; ask the user if the choice
+   is unclear. Before `createLab`, obtain a lab name if none was supplied.
+   Check `getLabStatus`, run a small Lua/LSP example, inspect `readRuntimeTrace`,
+   and open the returned lab URL.
+   Help resolve setup failures before reporting the connection ready.
+
+Begin device application work with the binding design above. LSP-Claw can
+test installed Lua APIs; adding native bindings still requires a firmware
+build and deployment. Preserve applications and settings in `/xedge`.
+
 ## Repository map
 
 | Path | Purpose |
@@ -48,10 +129,27 @@ its legacy key API remains a separate integration issue.
 
 For RT1020 flashing, use `scripts/flash_rt1020.py --probe <exact-probe-id> --image <zephyr.bin>` as described in the [board guide](doc/mimxrt1020-evk.md#flash-and-connect). It follows the ThreadX method: connect under reset, explicitly reset with `SYSRESETREQ`, mask interrupts with `PRIMASK`, and disable SysTick before the RAM flash algorithm. Use sector erase to preserve `/xedge`, then another full system reset, ROM initialization, and full image readback at the application entry before resuming. Do not substitute generic `west flash` or `pyocd flash` commands that use core-only `VECTRESET`. Keep SW8 in normal QSPI boot mode for routine updates; use ROM recovery only if debugger access remains unavailable after checking power, cables, and SWD jumpers. The script's `--verify-only` option also resets and boots the board.
 
+## Verify the Running Target
+
+Inspect the current serial or simulator log for Xedge startup, filesystem,
+entropy, time, and network errors. Use the observed address to open `/rtl/`.
+Save and run a small Lua/LSP application, check its expected output and trace,
+then stop/start it. Verify writable storage and persistence across an
+authorized target restart. Check time and the actual TLS trust result when
+the application uses HTTPS.
+
+For device work, exercise a harmless read or an explicitly requested output
+change through the relevant Lua binding, including an error path. Report the
+board or simulator, image/build configuration, IDE and lab URLs, and checks
+actually completed. Keep simulator, flash/readback, network, application, and
+peripheral results distinct. Leave the target usable and preserve application
+data and PSA keys. Identify unavailable hardware or access instead of treating
+compilation or the editor page as a hardware-runtime pass.
+
 ## Source conventions
 
-- Inspect the root and submodule status before editing and preserve existing work. Follow [BAS/AGENTS.md](BAS/AGENTS.md) for native runtime changes and use the public headers for API definitions.
-- Make BAS fixes in the authoritative SDK, then regenerate the amalgamation and copy it into the BAS submodule. Do not hand-edit generated BAS code or maintain patches over it.
+- Inspect the root and submodule status before editing and preserve existing work. Follow the [BAS agent guide](https://github.com/RealTimeLogic/BAS/blob/main/AGENTS.md) for native runtime changes and use the public headers for API definitions.
+- Treat BAS and BAS-Resources submodules as read-only. Make shared fixes in their standalone repositories; for generated BAS code, use the authoritative SDK and amalgamation workflow. Update parent dependency pointers only to published, tested commits. Do not copy local changes into submodules, hand-edit generated BAS code, or maintain patches over it.
 - Compile one BAS amalgamation with the selected Zephyr thread, generic socket, allocator, and filesystem sources. Keep source selection in `zephyr/CMakeLists.txt`.
 - Put board-specific settings in that board's `.conf` and `.overlay`. Keep the simulator's 2 MiB heap, static network, FUSE, and test entropy settings independent of hardware configurations.
 - Preserve heap alignment, external-memory initialization, hardware entropy seeding, and the `xedge_ready` synchronization when adding Lua bindings or startup code.

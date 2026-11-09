@@ -1,6 +1,8 @@
 # Xedge for Zephyr
 
-Build your device's web interface and connected services with Xedge for Zephyr. [Xedge](https://realtimelogic.com/products/xedge/) brings the [Barracuda App Server](https://realtimelogic.com/products/barracuda-application-server/) (BAS), Lua runtime, and a browser-based integrated development environment (IDE) to Zephyr. Keep hardware control in C and develop your Lua and Lua Server Pages (LSP) applications from the browser, without reflashing firmware for each application change.
+Build your device's web interface and connected services with [Xedge](https://realtimelogic.com/products/xedge/) for Zephyr. [Xedge](https://realtimelogic.com/products/xedge/) brings the [Barracuda App Server](https://realtimelogic.com/products/barracuda-application-server/) (BAS), Lua runtime, and a browser-based integrated development environment (IDE) to Zephyr. Keep hardware control in C and develop your applications in Lua from the browser, without reflashing firmware for each application change.
+
+Xedge includes Ethernet, IPv4/IPv6, SharkSSL HTTPS, asynchronous sockets, UDP, MQTT, Modbus, OPC UA, and Internet time synchronization.
 
 ![Xedge browser IDE](https://realtimelogic.com/images/xedge/v1/Xedge.png)
 
@@ -25,6 +27,8 @@ Allow at least **2 MiB for the Xedge heap**, plus RAM for Zephyr and your native
 3. [Set up trusted HTTPS](#automatic-certificate-management) and [authentication](#configure-https-and-access) for access to the device.
 
 To bring Xedge to your own hardware, follow [Adding a board](doc/adding-boards.md).
+
+## Using an AI Agent (optional)
 
 For AI-assisted builds and porting, give your coding agent [AGENTS.md](AGENTS.md). It maps the source tree, build workflows, and integration requirements; the board guides provide target-specific programming instructions.
 
