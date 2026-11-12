@@ -1,0 +1,5 @@
+# Xedge Barracuda App Server for Zephyr RTOS
+name: xedge
+build:
+  cmake: zephyr
+  kconfig: zephyr/Kconfig
